@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- ALTRON'Z Robotics & IoT Official Icon -->
+  <rect width="64" height="64" rx="14" fill="#08090C"/>
+  <rect x="2" y="2" width="60" height="60" rx="12" stroke="#1F2430" stroke-width="1.5"/>
+  
+  <!-- Circuit Grid Trace Lines -->
+  <path d="M12 32H20M44 32H52M32 12V20M32 44V52" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+  <circle cx="12" cy="32" r="1.5" fill="#EF4444"/>
+  <circle cx="52" cy="32" r="1.5" fill="#EF4444"/>
+  <circle cx="32" cy="12" r="1.5" fill="#EF4444"/>
+  <circle cx="32" cy="52" r="1.5" fill="#EF4444"/>
+
+  <!-- Outer Angular Mechatronic Hexagon -->
+  <polygon points="32,16 48,25 48,39 32,48 16,39 16,25" fill="#0E121A" stroke="#DC2626" stroke-width="2" stroke-linejoin="round"/>
+  
+  <!-- Dynamic 'A' and 'Z' Geometric Core -->
+  <path d="M22 38L32 20L42 38" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Crossbar and Z-bar in bright electric red -->
+  <path d="M26 31H38L24 43H40" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Central Pulse Indicator -->
+  <circle cx="32" cy="32" r="2.5" fill="#DC2626"/>
+  <circle cx="32" cy="32" r="1" fill="#FFFFFF"/>
+</svg>

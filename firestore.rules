@@ -1,0 +1,156 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Helpers
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Admin helper: authenticated user exists in /admins collection or runtime bootstrap email
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == 'ssmssai2007@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    // Validation helper for Student Registrations (PRESERVED EXACTLY)
+    function isValidRegistration(data) {
+      return data.keys().hasAll([
+        'studentName',
+        'email',
+        'phone',
+        'schoolOrCollege',
+        'departmentOrClass',
+        'targetType',
+        'targetId',
+        'targetTitle',
+        'status',
+        'createdAt'
+      ]) &&
+      data.keys().hasOnly([
+        'studentName',
+        'email',
+        'phone',
+        'schoolOrCollege',
+        'departmentOrClass',
+        'targetType',
+        'targetId',
+        'targetTitle',
+        'teamName',
+        'teamSize',
+        'teammateDetails',
+        'experienceLevel',
+        'status',
+        'createdAt'
+      ]) &&
+      data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 100 &&
+      data.email is string && data.email.size() <= 120 && data.email.matches('^[^@]+@[^@]+\\.[^@]+$') &&
+      data.phone is string && data.phone.size() >= 5 && data.phone.size() <= 25 &&
+      data.schoolOrCollege is string && data.schoolOrCollege.size() >= 2 && data.schoolOrCollege.size() <= 150 &&
+      data.departmentOrClass is string && data.departmentOrClass.size() >= 1 && data.departmentOrClass.size() <= 100 &&
+      data.targetType in ['event', 'workshop'] &&
+      data.targetId is string && data.targetId.size() <= 64 &&
+      data.targetTitle is string && data.targetTitle.size() <= 150 &&
+      data.status in ['confirmed', 'pending', 'waitlist'] &&
+      (!('teamName' in data) || (data.teamName is string && data.teamName.size() <= 80)) &&
+      (!('teamSize' in data) || (data.teamSize is number && data.teamSize >= 1 && data.teamSize <= 20)) &&
+      (!('teammateDetails' in data) || (data.teammateDetails is string && data.teammateDetails.size() <= 300)) &&
+      (!('experienceLevel' in data) || (data.experienceLevel in ['Beginner', 'Intermediate', 'Advanced']));
+    }
+
+    // 1. Registrations Collection
+    match /registrations/{registrationId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(registrationId) &&
+                       isValidRegistration(incoming()) &&
+                       incoming().createdAt == request.time &&
+                       incoming().status == 'confirmed';
+      allow update: if isAdmin() &&
+                       isValidRegistration(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+      allow delete: if isAdmin();
+    }
+
+    // 2. Admins Collection: holds UID mappings for authorized staff
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 3. Photo Gallery Collection
+    match /gallery/{galleryId} {
+      allow get: if isValidId(galleryId) && (resource.data.published == true || isAdmin());
+      allow list: if resource.data.published == true || isAdmin();
+      allow create: if isAdmin() && isValidId(galleryId);
+      allow update: if isAdmin() && isValidId(galleryId);
+      allow delete: if isAdmin() && isValidId(galleryId);
+    }
+
+    // 4. Team Members Collection
+    match /teamMembers/{memberId} {
+      allow get: if isValidId(memberId) && (resource.data.published == true || isAdmin());
+      allow list: if resource.data.published == true || isAdmin();
+      allow create: if isAdmin() && isValidId(memberId);
+      allow update: if isAdmin() && isValidId(memberId);
+      allow delete: if isAdmin() && isValidId(memberId);
+    }
+
+    // 5. Achievements & Awards Collection
+    match /achievements/{achievementId} {
+      allow get: if isValidId(achievementId) && (resource.data.published == true || isAdmin());
+      allow list: if resource.data.published == true || isAdmin();
+      allow create: if isAdmin() && isValidId(achievementId);
+      allow update: if isAdmin() && isValidId(achievementId);
+      allow delete: if isAdmin() && isValidId(achievementId);
+    }
+
+    // 6. R&D Projects Collection
+    match /projects/{projectId} {
+      allow get: if isValidId(projectId) && (resource.data.published == true || isAdmin());
+      allow list: if resource.data.published == true || isAdmin();
+      allow create: if isAdmin() && isValidId(projectId);
+      allow update: if isAdmin() && isValidId(projectId);
+      allow delete: if isAdmin() && isValidId(projectId);
+    }
+
+    // 7. Events Collection
+    match /events/{eventId} {
+      allow get: if isValidId(eventId) && (resource.data.published == true || resource.data.status == 'published' || isAdmin());
+      allow list: if resource.data.published == true || resource.data.status == 'published' || isAdmin();
+      allow create: if isAdmin() && isValidId(eventId);
+      allow update: if isAdmin() && isValidId(eventId);
+      allow delete: if isAdmin() && isValidId(eventId);
+    }
+
+    // 8. Workshops Collection
+    match /workshops/{workshopId} {
+      allow get: if isValidId(workshopId) && (resource.data.published == true || resource.data.status == 'published' || isAdmin());
+      allow list: if resource.data.published == true || resource.data.status == 'published' || isAdmin();
+      allow create: if isAdmin() && isValidId(workshopId);
+      allow update: if isAdmin() && isValidId(workshopId);
+      allow delete: if isAdmin() && isValidId(workshopId);
+    }
+  }
+}

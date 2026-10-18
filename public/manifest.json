@@ -1,0 +1,28 @@
+{
+  "name": "ALTRON'Z ROBOTICS TEAM & IOT",
+  "short_name": "ALTRON'Z",
+  "description": "Official platform for ALTRON'Z ROBOTICS TEAM & IOT. Competitions, workshops in IoT and embedded systems, registrations, and project showcase.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#08090C",
+  "theme_color": "#08090C",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

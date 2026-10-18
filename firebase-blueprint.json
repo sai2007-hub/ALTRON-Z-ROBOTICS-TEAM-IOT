@@ -1,0 +1,261 @@
+{
+  "entities": {
+    "Registration": {
+      "title": "Registration",
+      "description": "Student registration for a competition event or workshop.",
+      "type": "object",
+      "properties": {
+        "studentName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Full name of the student"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 120,
+          "description": "Contact email of the student"
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 25,
+          "description": "Contact phone number"
+        },
+        "schoolOrCollege": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 150,
+          "description": "Name of school, college, or university"
+        },
+        "departmentOrClass": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Class, department, or academic year"
+        },
+        "targetType": {
+          "type": "string",
+          "enum": ["event", "workshop"],
+          "description": "Type of program registered for"
+        },
+        "targetId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Identifier of the target event or workshop"
+        },
+        "targetTitle": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Title of the target event or workshop"
+        },
+        "teamName": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Optional team name for team events"
+        },
+        "teamSize": {
+          "type": "number",
+          "description": "Number of members in the team"
+        },
+        "teammateDetails": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Optional names and details of teammates"
+        },
+        "experienceLevel": {
+          "type": "string",
+          "enum": ["Beginner", "Intermediate", "Advanced"],
+          "description": "Experience level of the participant"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["confirmed", "pending", "waitlist"],
+          "description": "Verification status of the registration"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Server timestamp when the registration was created"
+        }
+      },
+      "required": [
+        "studentName",
+        "email",
+        "phone",
+        "schoolOrCollege",
+        "departmentOrClass",
+        "targetType",
+        "targetId",
+        "targetTitle",
+        "status",
+        "createdAt"
+      ]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized administrator profile",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Admin email address"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "superadmin"],
+          "description": "Administrative role level"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["email", "role"]
+    },
+    "GalleryItem": {
+      "title": "GalleryItem",
+      "description": "Photo Gallery image archive record",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "eventOrWorkshop": { "type": "string" },
+        "year": { "type": "number" },
+        "category": { "type": "string" },
+        "caption": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "published": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "published"]
+    },
+    "TeamMember": {
+      "title": "TeamMember",
+      "description": "Robotics team engineer profile",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "subsystem": { "type": "string" },
+        "bio": { "type": "string" },
+        "skills": { "type": "array" },
+        "imageUrl": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "isLead": { "type": "boolean" },
+        "published": { "type": "boolean" }
+      },
+      "required": ["name", "role", "published"]
+    },
+    "Achievement": {
+      "title": "Achievement",
+      "description": "Competition honor or award trophy",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "eventName": { "type": "string" },
+        "year": { "type": "number" },
+        "rankOrAward": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "published": { "type": "boolean" }
+      },
+      "required": ["title", "eventName", "year", "published"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "R&D robot or embedded machine",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "summary": { "type": "string" },
+        "description": { "type": "string" },
+        "technologies": { "type": "array" },
+        "status": { "type": "string" },
+        "teamLead": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "published": { "type": "boolean" }
+      },
+      "required": ["title", "category", "published"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Robotics tournament competition",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "slug": { "type": "string" },
+        "category": { "type": "string" },
+        "date": { "type": "string" },
+        "venue": { "type": "string" },
+        "published": { "type": "boolean" }
+      },
+      "required": ["title", "slug", "published"]
+    },
+    "Workshop": {
+      "title": "Workshop",
+      "description": "Educational robotics & IoT workshop",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "slug": { "type": "string" },
+        "track": { "type": "string" },
+        "targetAudience": { "type": "string" },
+        "published": { "type": "boolean" }
+      },
+      "required": ["title", "slug", "published"]
+    }
+  },
+  "firestore": {
+    "/registrations/{registrationId}": {
+      "schema": {
+        "$ref": "#/entities/Registration"
+      },
+      "description": "Collection of student registrations submitted for events and workshops"
+    },
+    "/admins/{adminId}": {
+      "schema": {
+        "$ref": "#/entities/Admin"
+      },
+      "description": "Collection of designated administrator accounts"
+    },
+    "/gallery/{galleryId}": {
+      "schema": {
+        "$ref": "#/entities/GalleryItem"
+      },
+      "description": "Photo Gallery image records and storage references"
+    },
+    "/teamMembers/{memberId}": {
+      "schema": {
+        "$ref": "#/entities/TeamMember"
+      },
+      "description": "Team member profiles and leadership hierarchy"
+    },
+    "/achievements/{achievementId}": {
+      "schema": {
+        "$ref": "#/entities/Achievement"
+      },
+      "description": "Tournament awards and competition wins"
+    },
+    "/projects/{projectId}": {
+      "schema": {
+        "$ref": "#/entities/Project"
+      },
+      "description": "R&D projects and prototype hardware"
+    },
+    "/events/{eventId}": {
+      "schema": {
+        "$ref": "#/entities/Event"
+      },
+      "description": "Tournament and competition event details"
+    },
+    "/workshops/{workshopId}": {
+      "schema": {
+        "$ref": "#/entities/Workshop"
+      },
+      "description": "Institutional robotics and IoT workshop tracks"
+    }
+  }
+}

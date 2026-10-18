@@ -1,0 +1,6 @@
+{
+  "name": "ALTRON'Z ROBOTICS TEAM & IOT",
+  "description": "Official platform for ALTRON'Z ROBOTICS TEAM & IOT. Competitions, workshops in IoT and embedded systems, registrations, and project showcase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
