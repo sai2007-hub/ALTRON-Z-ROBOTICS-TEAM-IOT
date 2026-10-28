@@ -26,11 +26,22 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenRegister,
   onOpenEnquiry,
 }) => {
-  const { events, workshops, achievements, gallery } = useApp();
+  const { events, workshops, achievements, gallery, homepageStats } = useApp();
 
-  const featuredEvents = events
-    .filter((e) => e.status === 'published' || (e.status !== 'draft' && e.published !== false))
-    .slice(0, 3);
+  const isEventActive = (evt: any) => {
+    if (!evt) return false;
+    if (['evt-1', 'evt-2', 'evt-3', 'evt-4'].includes(evt.id)) return false;
+    if (evt.status !== 'published' && evt.published !== true) return false;
+    const statusStr = String(evt.status || '').toLowerCase();
+    if (statusStr === 'archived' || statusStr === 'closed' || statusStr === 'completed') return false;
+    if (evt.registrationDeadline) {
+      const deadline = new Date(evt.registrationDeadline).getTime();
+      if (!isNaN(deadline) && deadline < Date.now()) return false;
+    }
+    return true;
+  };
+
+  const activeCompetitions = events.filter(isEventActive);
   const featuredWorkshops = workshops
     .filter((w) => w.status === 'published' || (w.status !== 'draft' && w.published !== false))
     .slice(0, 3);
@@ -60,13 +71,15 @@ export const HomePage: React.FC<HomePageProps> = ({
 
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 pt-2">
-              <button
-                onClick={() => onOpenRegister(events[0], 'event')}
-                className="w-full sm:w-auto px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold text-sm rounded-lg transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2 min-h-[44px] focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none cursor-pointer"
-              >
-                <span>Register for Competitions</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              {activeCompetitions.length > 0 && (
+                <button
+                  onClick={() => onOpenRegister(activeCompetitions[0], 'event')}
+                  className="w-full sm:w-auto px-6 py-3.5 bg-red-600 hover:bg-red-500 text-white font-bold text-sm rounded-lg transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2 min-h-[44px] focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none cursor-pointer"
+                >
+                  <span>Register for Competitions</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
 
               <button
                 onClick={() => onOpenEnquiry('Robotics & Microcontrollers')}
@@ -80,196 +93,187 @@ export const HomePage: React.FC<HomePageProps> = ({
             <div className="flex flex-wrap items-center gap-6 pt-4 text-xs text-zinc-500 font-mono">
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-red-500" />
-                <span>3.0 kg Autonomous Sumo</span>
+                <span>Autonomous Mechatronics</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-red-500" />
-                <span>Holonomic 2v2 Soccer</span>
+                <span>Embedded Hardware</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-red-500" />
-                <span>ESP32 & STM32 Bare-Metal</span>
+                <span>ESP32 &amp; STM32 Bare-Metal</span>
               </div>
             </div>
           </div>
 
-          {/* Hero Visual Display */}
+          {/* Authentic Society & Engineering Lab Hub */}
           <div className="lg:col-span-5">
             <div className="relative rounded-2xl bg-gradient-to-b from-[#141824] to-[#0A0D14] border border-zinc-800 p-6 shadow-2xl space-y-6">
               <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
                 <div>
                   <span className="text-[11px] font-mono text-red-400 uppercase tracking-wider block">
-                    Flagship Platform
+                    Engineering Society
                   </span>
-                  <h3 className="text-lg font-bold text-white">Titan v3 Combat Wedge</h3>
+                  <h3 className="text-lg font-bold text-white">ALTRON&apos;Z Robotics &amp; IoT Lab</h3>
                 </div>
                 <span className="text-xs font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-1 rounded">
-                  3.0 KG DOHYO CLASS
+                  ACTIVE HUB
                 </span>
               </div>
 
-              {/* High-tech vector visual */}
-              <RoboVisual type="sumo" className="h-56" badge="STATUS: READY FOR RING" />
+              {/* Technical vector visual */}
+              <RoboVisual type="lab" className="h-56" badge="SYSTEMS & HARDWARE LAB" />
 
               <div className="grid grid-cols-2 gap-4 text-xs font-mono pt-2 border-t border-zinc-800/80">
                 <div>
-                  <span className="text-zinc-500 block text-[10px]">DOWNFORCE</span>
-                  <span className="font-bold text-zinc-200">450 N (Neodymium)</span>
+                  <span className="text-zinc-500 block text-[10px]">CORE DOMAIN</span>
+                  <span className="font-bold text-zinc-200">Autonomous &amp; IoT</span>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block text-[10px]">RESPONSE TIME</span>
-                  <span className="font-bold text-zinc-200">3.8 ms (Optical)</span>
+                  <span className="text-zinc-500 block text-[10px]">HARDWARE STACK</span>
+                  <span className="font-bold text-zinc-200">ESP32 &middot; STM32 &middot; RTOS</span>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block text-[10px]">BATTERY PACK</span>
-                  <span className="font-bold text-zinc-200">6S 100C LiPo</span>
+                  <span className="text-zinc-500 block text-[10px]">LAB WORKSHOPS</span>
+                  <span className="font-bold text-zinc-200">Hands-on Hardware</span>
                 </div>
                 <div>
-                  <span className="text-zinc-500 block text-[10px]">CHASSIS ALLOY</span>
-                  <span className="font-bold text-zinc-200">7075-T6 + Hardox</span>
+                  <span className="text-zinc-500 block text-[10px]">MENTORSHIP</span>
+                  <span className="font-bold text-zinc-200">Peer &amp; Project-Based</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 4-Column Proof Metrics Strip */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-16 border-t border-white/5 mt-16">
-          <div className="space-y-1">
-            <p className="text-3xl sm:text-4xl font-extrabold text-white font-mono tabular-nums tracking-tight">
-              45+
-            </p>
-            <p className="text-xs text-zinc-400 font-medium">Workshops Conducted</p>
-            <p className="text-[11px] text-zinc-600">Across 32 schools and colleges</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-3xl sm:text-4xl font-extrabold text-white font-mono tabular-nums tracking-tight">
-              3,850+
-            </p>
-            <p className="text-xs text-zinc-400 font-medium">Students Trained</p>
-            <p className="text-[11px] text-zinc-600">Hands-on firmware & wiring kits</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-3xl sm:text-4xl font-extrabold text-white font-mono tabular-nums tracking-tight">
-              18
-            </p>
-            <p className="text-xs text-zinc-400 font-medium">Podium Trophies</p>
-            <p className="text-[11px] text-zinc-600">National & regional championships</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-3xl sm:text-4xl font-extrabold text-white font-mono tabular-nums tracking-tight">
-              100%
-            </p>
-            <p className="text-xs text-zinc-400 font-medium">Hardware Immersion</p>
-            <p className="text-[11px] text-zinc-600">Real soldering, PCBs, and testbenches</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 2. Featured Competitions & Events */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
-          <div>
-            <div className="text-xs font-mono text-red-500 uppercase tracking-widest mb-1">
-              Tournament Arena
+        {/* Dynamic Verified Team Statistics Strip */}
+        <div
+          className={`grid grid-cols-2 ${
+            homepageStats.length >= 4
+              ? 'md:grid-cols-4'
+              : homepageStats.length === 3
+              ? 'md:grid-cols-3'
+              : 'md:grid-cols-2'
+          } gap-6 pt-16 border-t border-white/5 mt-16`}
+        >
+          {homepageStats.map((stat) => (
+            <div key={stat.id} className="space-y-1.5">
+              <p className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white font-mono tabular-nums tracking-tight">
+                {stat.value}
+              </p>
+              <p className="text-xs text-zinc-300 font-semibold tracking-wide">{stat.title}</p>
+              <p className="text-[11px] text-zinc-500 leading-relaxed">{stat.description}</p>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Flagship Robotics Competitions
-            </h2>
-          </div>
-          <button
-            onClick={() => setCurrentView('events')}
-            className="text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors group"
-          >
-            <span>View All Competitions & Rules</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {featuredEvents.map((evt) => {
-            const visualType =
-              evt.slug === 'robo-sumo' ? 'sumo' : evt.slug === 'robo-soccer' ? 'soccer' : 'rover';
-            const percentFilled = Math.min(100, Math.round((evt.registeredCount / evt.capacity) * 100));
-
-            return (
-              <div
-                key={evt.id}
-                className="bg-[#0D1017] border border-zinc-800 rounded-xl overflow-hidden flex flex-col hover:border-zinc-700 transition-all group"
-              >
-                <div className="p-4 bg-[#12151F] border-b border-zinc-800/80">
-                  <RoboVisual type={visualType} className="h-44" title={evt.category} />
-                </div>
-
-                <div className="p-6 flex-1 flex flex-col justify-between space-y-5">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-xs text-zinc-500">
-                      <span>{evt.category} Arena</span>
-                      <span>{evt.teamSize}</span>
-                    </div>
-
-                    <h3 className="text-lg font-bold text-white group-hover:text-red-400 transition-colors">
-                      {evt.title}
-                    </h3>
-
-                    <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2">
-                      {evt.shortDescription}
-                    </p>
-
-                    <div className="space-y-2 pt-2 text-xs text-zinc-400 border-t border-zinc-800/60">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5 text-zinc-500" />
-                        <span>{evt.date}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-zinc-500" />
-                        <span className="truncate">{evt.venue}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Capacity Bar & Action */}
-                  <div className="space-y-3 pt-4 border-t border-zinc-800/80">
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[11px] font-mono">
-                        <span className="text-zinc-500">Slots Filled:</span>
-                        <span className="text-zinc-300 font-semibold tabular-nums">
-                          {evt.registeredCount} / {evt.capacity} teams
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-red-600 rounded-full"
-                          style={{ width: `${percentFilled}%` }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        onClick={() => {
-                          if (evt.slug === 'robo-sumo') setCurrentView('sumo');
-                          else if (evt.slug === 'robo-soccer') setCurrentView('soccer');
-                          else setCurrentView('events');
-                        }}
-                        className="flex-1 py-2 text-xs font-semibold text-zinc-300 bg-zinc-900 hover:bg-zinc-800 rounded-lg text-center transition-colors"
-                      >
-                        Rules & Specs
-                      </button>
-                      <button
-                        onClick={() => onOpenRegister(evt, 'event')}
-                        className="flex-1 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg text-center transition-colors shadow-sm shadow-red-600/20"
-                      >
-                        Register
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+          ))}
         </div>
       </section>
+
+      {/* 2. Featured Competitions & Events - Rendered ONLY if active competitions exist */}
+      {activeCompetitions.length > 0 && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
+            <div>
+              <div className="text-xs font-mono text-red-500 uppercase tracking-widest mb-1">
+                Tournament Arena
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                Robotics Competitions
+              </h2>
+            </div>
+            <button
+              onClick={() => setCurrentView('events')}
+              className="text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-1.5 transition-colors group cursor-pointer"
+            >
+              <span>View All Competitions &amp; Rules</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {activeCompetitions.slice(0, 3).map((evt) => {
+              const visualType =
+                evt.slug === 'robo-sumo' ? 'sumo' : evt.slug === 'robo-soccer' ? 'soccer' : 'rover';
+              const percentFilled = Math.min(100, Math.round((evt.registeredCount / evt.capacity) * 100));
+
+              return (
+                <div
+                  key={evt.id}
+                  className="bg-[#0D1017] border border-zinc-800 rounded-xl overflow-hidden flex flex-col hover:border-zinc-700 transition-all group"
+                >
+                  <div className="p-4 bg-[#12151F] border-b border-zinc-800/80">
+                    <RoboVisual type={visualType} className="h-44" title={evt.category} />
+                  </div>
+
+                  <div className="p-6 flex-1 flex flex-col justify-between space-y-5">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs text-zinc-500">
+                        <span>{evt.category} Arena</span>
+                        <span>{evt.teamSize}</span>
+                      </div>
+
+                      <h3 className="text-lg font-bold text-white group-hover:text-red-400 transition-colors">
+                        {evt.title}
+                      </h3>
+
+                      <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2">
+                        {evt.shortDescription}
+                      </p>
+
+                      <div className="space-y-2 pt-2 text-xs text-zinc-400 border-t border-zinc-800/60">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-zinc-500" />
+                          <span>{evt.date}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-zinc-500" />
+                          <span className="truncate">{evt.venue}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Capacity Bar & Action */}
+                    <div className="space-y-3 pt-4 border-t border-zinc-800/80">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] font-mono">
+                          <span className="text-zinc-500">Slots Filled:</span>
+                          <span className="text-zinc-300 font-semibold tabular-nums">
+                            {evt.registeredCount} / {evt.capacity} teams
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-red-600 rounded-full"
+                            style={{ width: `${percentFilled}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          onClick={() => {
+                            if (evt.slug === 'robo-sumo') setCurrentView('sumo');
+                            else if (evt.slug === 'robo-soccer') setCurrentView('soccer');
+                            else setCurrentView('events');
+                          }}
+                          className="flex-1 py-2 text-xs font-semibold text-zinc-300 bg-zinc-900 hover:bg-zinc-800 rounded-lg text-center transition-colors cursor-pointer"
+                        >
+                          Rules &amp; Specs
+                        </button>
+                        <button
+                          onClick={() => onOpenRegister(evt, 'event')}
+                          className="flex-1 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-500 rounded-lg text-center transition-colors shadow-sm shadow-red-600/20 cursor-pointer"
+                        >
+                          Register
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* 3. Upcoming Workshops in Schools & Colleges */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -471,19 +475,23 @@ export const HomePage: React.FC<HomePageProps> = ({
               Ready to Compete or Bring Robotics to Your Campus?
             </h3>
             <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
-              Register your team for the upcoming Robo Sumo or Robo Soccer invitationals, or book our certified engineering instructors for a 2-day hands-on IoT bootcamp.
+              {activeCompetitions.length > 0
+                ? "Register your team for our upcoming robotics invitationals, or book our certified engineering instructors for a 2-day hands-on IoT bootcamp."
+                : "Explore our hands-on engineering programs and book our certified engineering instructors for a 2-day hands-on robotics and IoT bootcamp."}
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
-            <button
-              onClick={() => onOpenRegister(events[0], 'event')}
-              className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg transition-colors shadow-lg shadow-red-600/20 whitespace-nowrap"
-            >
-              Register for Competition
-            </button>
+            {activeCompetitions.length > 0 && (
+              <button
+                onClick={() => onOpenRegister(activeCompetitions[0], 'event')}
+                className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg transition-colors shadow-lg shadow-red-600/20 whitespace-nowrap cursor-pointer"
+              >
+                Register for Competition
+              </button>
+            )}
             <button
               onClick={() => onOpenEnquiry()}
-              className="w-full sm:w-auto px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 font-semibold text-xs rounded-lg transition-colors whitespace-nowrap"
+              className="w-full sm:w-auto px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 font-semibold text-xs rounded-lg transition-colors whitespace-nowrap cursor-pointer"
             >
               Enquire for Institution
             </button>

@@ -14,10 +14,25 @@ import {
   Building2,
   GraduationCap,
   Award,
+  MessageCircle,
+  ExternalLink,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { EventItem, WorkshopItem } from '../../types';
 import { RegistrationInput } from '../../services/registrationService';
+
+export const isValidWhatsAppInviteUrl = (url?: string): boolean => {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    const isWhatsAppHost = host === 'chat.whatsapp.com' || host === 'wa.me' || host.endsWith('.whatsapp.com');
+    return (parsed.protocol === 'https:' || parsed.protocol === 'http:') && isWhatsAppHost && parsed.pathname.length > 2;
+  } catch {
+    return false;
+  }
+};
 
 interface EventRegistrationModalProps {
   isOpen: boolean;
@@ -40,6 +55,7 @@ interface ConfirmedRegistrationRecord {
   teamSize?: number;
   status: string;
   timestamp: string;
+  whatsappInviteUrl?: string;
 }
 
 export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
@@ -243,6 +259,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
 
       if (result.success && result.regId) {
         // Successful write to Firestore: capture verified document ID & record
+        const eventInviteUrl = selectedType === 'event' ? currentEvent?.whatsappInviteUrl : undefined;
         setSuccessRecord({
           regId: result.regId,
           studentName: regPayload.studentName,
@@ -256,6 +273,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
           teamSize: regPayload.teamSize,
           status: result.status || 'confirmed',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          whatsappInviteUrl: isValidWhatsAppInviteUrl(eventInviteUrl) ? eventInviteUrl : undefined,
         });
 
         // Only reset form inputs AFTER database operation confirms success
@@ -439,6 +457,36 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                   <span className="font-mono">{successRecord.timestamp}</span>
                 </div>
               </div>
+
+              {/* Requirement 3: WhatsApp Group Invite Link for Events */}
+              {successRecord.whatsappInviteUrl && (
+                <div className="p-4 rounded-xl bg-emerald-950/30 border border-emerald-600/40 space-y-3 shadow-lg">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-400">
+                      <MessageCircle className="w-4 h-4 fill-emerald-500/20 text-emerald-400" />
+                      <span>Official Event WhatsApp Group</span>
+                    </div>
+                    <span className="text-[10px] font-mono uppercase text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700/60 font-semibold">
+                      Tournament Updates
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-300 leading-relaxed">
+                    Join the dedicated participant group for official reporting times, schedule updates, and live queries with tournament coordinators.
+                  </p>
+                  <a
+                    href={successRecord.whatsappInviteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-4 bg-[#25D366] hover:bg-[#20BD5A] text-zinc-950 font-bold text-xs sm:text-sm rounded-lg transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Join WhatsApp Group</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                  <p className="text-[10px] text-zinc-500 text-center leading-normal">
+                    Note: Joining the WhatsApp group connects you with organizers and does not constitute verified attendance at the arena.
+                  </p>
+                </div>
+              )}
 
               {/* Requirement 1: Button to return to the home page */}
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">

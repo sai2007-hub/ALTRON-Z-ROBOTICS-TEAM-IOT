@@ -6,132 +6,31 @@ import {
   GalleryItem,
   TeamMember,
   Registration,
+  HomepageStat,
+  FooterAboutConfig,
+  ContactPageConfig,
 } from '../types';
 
 export const initialEvents: EventItem[] = [
   {
-    id: 'evt-1',
-    slug: 'robo-sumo',
-    title: 'Robo Sumo Championship 2026',
+    id: 'evt-closed-1',
+    slug: 'robo-combat-league-2025',
+    title: 'National Robo Combat League 2025',
     category: 'Combat',
-    shortDescription: 'High-torque autonomous and RC heavyweight sumo wrestling bots clash on an official steel ring.',
-    fullDescription: 'Robo Sumo is ALTRON\'Z flagship combat engineering challenge. Two autonomous or teleoperated robotic vehicles enter the ring, and only one leaves. Bots must detect opponent positions with ultrasonic and infrared arrays, maintain traction with neodymium magnet downforce arrays, and push opponents out of the circular dohyo within 3-minute bouts.',
-    rules: [
-      'Maximum robot weight: 3.0 kg (including all batteries and weapons).',
-      'Maximum starting footprint: 20 cm x 20 cm (unlimited expansion permitted once match begins).',
-      'Autonomous bots must observe a strict 5.0-second delay upon match referee start signal.',
-      'No electro-magnetic jamming, liquid dispersal, or entanglement devices allowed.',
-      'Dohyo diameter: 154 cm black steel surface with 5 cm white border line.',
-      'Best of 3 rounds per match. A robot touching the exterior floor loses the round.'
-    ],
-    dimensionsAndSpecs: [
-      'Weight limit: 3000g max',
-      'Starting dimensions: 200mm x 200mm',
-      'Ring diameter: 1540mm Dohyo',
-      'Power: Max 24V DC battery supply',
-      'Control: RC 2.4GHz or fully autonomous'
-    ],
-    date: 'November 14, 2026',
-    time: '09:00 AM - 05:30 PM',
-    venue: 'ALTRON\'Z Arena - Tech Complex Hall A',
-    registrationDeadline: 'November 05, 2026',
+    shortDescription: 'Heavyweight combat bot championship concluded in Autumn 2025.',
+    fullDescription: 'The previous season national combat league, concluded with 32 competing university teams.',
+    rules: ['Combat rules as per 2025 league regulations.'],
+    dimensionsAndSpecs: ['Weight limit: 3000g max', 'Power: Max 24V DC'],
+    date: 'October 18, 2025',
+    time: '10:00 AM - 06:00 PM',
+    venue: 'National Tech Arena',
+    registrationDeadline: 'October 10, 2025',
     capacity: 32,
-    registeredCount: 24,
+    registeredCount: 32,
     entryFee: '$25 per team',
     teamSize: '2 to 4 members',
-    status: 'published',
-    highlights: ['Cash pool $1,500', 'Official Dohyo arena', 'Precision weigh-in inspection', 'Live telemetry stream']
-  },
-  {
-    id: 'evt-2',
-    slug: 'robo-soccer',
-    title: 'Robo Soccer Invitational 2026',
-    category: 'Sports',
-    shortDescription: 'Agile omni-directional robots engage in high-octane 2-versus-2 tactical robotic football.',
-    fullDescription: 'Robo Soccer tests precision maneuvering, low-latency teleoperation, and ball-handling mechanics. Equipped with 3-wheel or 4-wheel omni drives, brushless motors, and high-energy solenoid kickers, teams battle to dribble, pass, and shoot modulated infrared mini-balls into the opponent goal.',
-    rules: [
-      'Each team fields two active robots (1 Striker, 1 Goalkeeper/Support).',
-      'Robot footprint: 22 cm diameter cylinder, maximum height 22 cm.',
-      'Ball possession rule: Robot dribbler cannot engulf more than 20% of ball diameter.',
-      'Match duration: Two 7-minute halves with a 3-minute halftime strategy break.',
-      'Kicking mechanism: Max velocity compliant with arena safety standards (solenoid or spring-actuated).',
-      'Fouls: Intentional ramming into the goalkeeper inside the penalty crease results in penalty shootout.'
-    ],
-    dimensionsAndSpecs: [
-      'Pitch size: 240cm x 180cm artificial turf',
-      'Goal dimensions: 60cm width, 25cm height',
-      'Ball: Standard electronic pulsing IR beacon ball (75mm diameter)',
-      'Drive: Omni-wheel / Mecanum / differential drive allowed',
-      'Power: Up to 16.8V LiPo (4S)'
-    ],
-    date: 'November 15, 2026',
-    time: '10:00 AM - 06:00 PM',
-    venue: 'Field Hall B - Mechatronics Center',
-    registrationDeadline: 'November 06, 2026',
-    capacity: 24,
-    registeredCount: 19,
-    entryFee: '$30 per team',
-    teamSize: '3 to 5 members',
-    status: 'published',
-    highlights: ['Pulsing IR soccer ball', 'Standardized pitch', 'Referee video replay', '$1,800 Prize pool']
-  },
-  {
-    id: 'evt-3',
-    slug: 'maze-runner',
-    title: 'Micro-Mouse & Autonomous Maze Runner',
-    category: 'Autonomous',
-    shortDescription: 'Autonomous speed-demons mapping and navigating complex 16x16 mazes in record time.',
-    fullDescription: 'The pinnacle of embedded algorithms. Autonomous robots must explore an unknown 16x16 orthogonal labyrinth, compute optimal shortest-path trajectories using Floodfill or A* search, and execute high-speed speed runs without any human contact.',
-    rules: [
-      'Robot must be 100% self-contained and autonomous (no remote telemetry/commands).',
-      'Size constraint: 18 cm x 18 cm max during exploration.',
-      'Scoring: Score = Best Run Time + (Total Search Time / 30) - Penalties.',
-      'Maze walls are 5 cm high with 16.8 cm cell clearances.'
-    ],
-    dimensionsAndSpecs: [
-      '16 x 16 cell standard competition maze',
-      'Wall thickness: 12mm',
-      'Cell pitch: 180mm',
-      'Sensors allowed: Optical, LiDAR, Ultrasonic, IMU'
-    ],
-    date: 'November 14, 2026',
-    time: '01:00 PM - 06:00 PM',
-    venue: 'Robotics Lab 3 - Systems Wing',
-    registrationDeadline: 'November 08, 2026',
-    capacity: 20,
-    registeredCount: 15,
-    entryFee: '$20 per team',
-    teamSize: '1 to 3 members',
-    status: 'published',
-    highlights: ['Precision laser-cut maze', 'Electronic start/finish timing gates', 'Algorithm workshops prior to run']
-  },
-  {
-    id: 'evt-4',
-    slug: 'drone-obstacle',
-    title: 'Precision Drone Obstacle Challenge',
-    category: 'Aerial',
-    shortDescription: 'Pilot micro-quadcopters through illuminated acrobatic rings, tunnels, and wind chambers.',
-    fullDescription: 'An intense aerial navigation challenge testing pilot agility and autonomous stability. Drone pilots maneuver custom micro-quads through laser-lit rings, tight zig-zags, variable wind turbulence corridors, and precision landing pads.',
-    rules: [
-      'Frame size: Sub-250g class (propeller guards strictly mandatory).',
-      'FPV frequency: Assigned 5.8GHz video channel or digital HD link.',
-      'Three timed attempts per pilot. Missed gates add 5-second penalty each.'
-    ],
-    dimensionsAndSpecs: [
-      'Max weight: 250 grams with battery',
-      'Propeller size: Max 3.5 inches',
-      'Failsafe: Auto-disarm required within 1.0s of signal loss'
-    ],
-    date: 'November 15, 2026',
-    time: '01:30 PM - 05:30 PM',
-    venue: 'Open Quad Outdoor Enclosure',
-    registrationDeadline: 'November 07, 2026',
-    capacity: 16,
-    registeredCount: 12,
-    entryFee: '$20 per pilot',
-    teamSize: '1 to 2 members',
-    status: 'published',
-    highlights: ['Illuminated LED race gates', 'Safety netting enclosure', 'Live FPV spectator monitors']
+    status: 'archived',
+    highlights: ['Concluded Event', 'Official 2025 archive']
   }
 ];
 
@@ -515,7 +414,9 @@ export const initialRegistrations: Registration[] = [
     teammateDetails: 'Vikramaditya Roy (Lead), Elena Rostova, Marcus Chen',
     experienceLevel: 'Advanced',
     timestamp: '2026-10-14 14:32:10',
-    status: 'confirmed'
+    status: 'confirmed',
+    attendanceRecorded: false,
+    attended: false
   },
   {
     id: 'REG-8492',
@@ -532,7 +433,12 @@ export const initialRegistrations: Registration[] = [
     teammateDetails: 'Sarah Jenkins, David Kim, Priya Patel, Leo Vance',
     experienceLevel: 'Intermediate',
     timestamp: '2026-10-14 16:15:22',
-    status: 'confirmed'
+    status: 'confirmed',
+    attendanceRecorded: true,
+    attended: true,
+    attendance: 'present',
+    certificateIssued: true,
+    certificateId: 'CERT-ALT-2026-SOC01'
   },
   {
     id: 'REG-8493',
@@ -549,7 +455,9 @@ export const initialRegistrations: Registration[] = [
     teammateDetails: 'N/A',
     experienceLevel: 'Beginner',
     timestamp: '2026-10-15 09:20:45',
-    status: 'confirmed'
+    status: 'confirmed',
+    attendanceRecorded: false,
+    attended: false
   },
   {
     id: 'REG-8494',
@@ -566,7 +474,10 @@ export const initialRegistrations: Registration[] = [
     teammateDetails: 'Chloe Bennett, Tyler Ross',
     experienceLevel: 'Advanced',
     timestamp: '2026-10-15 11:42:01',
-    status: 'confirmed'
+    status: 'confirmed',
+    attendanceRecorded: true,
+    attended: true,
+    attendance: 'present'
   },
   {
     id: 'REG-8495',
@@ -583,6 +494,254 @@ export const initialRegistrations: Registration[] = [
     teammateDetails: 'N/A',
     experienceLevel: 'Intermediate',
     timestamp: '2026-10-15 13:05:19',
-    status: 'confirmed'
+    status: 'confirmed',
+    attendanceRecorded: false,
+    attended: false
+  },
+  {
+    id: 'REG-7101',
+    studentName: 'Rohan Mehra',
+    email: 'rohan.mehra@iitd.ac.in',
+    phone: '+91 98765 43210',
+    schoolOrCollege: 'Indian Institute of Technology Delhi',
+    departmentOrClass: '3rd Year Mechanical Eng',
+    targetType: 'event',
+    targetId: 'evt-closed-1',
+    targetTitle: 'National Robo Combat League 2025',
+    teamName: 'Titan Breaker',
+    teamSize: 3,
+    teammateDetails: 'Rohan Mehra, Aniket Roy, Deepa Nair',
+    experienceLevel: 'Advanced',
+    timestamp: '2025-10-02 14:10:00',
+    status: 'confirmed',
+    attendanceRecorded: true,
+    attended: true,
+    attendance: 'present',
+    certificateIssued: true,
+    certificateId: 'CERT-ALT-2025-COMBAT-01'
+  },
+  {
+    id: 'REG-7102',
+    studentName: 'Meera Krishnan',
+    email: 'meera.k@mitindia.edu',
+    phone: '+91 94451 22334',
+    schoolOrCollege: 'Madras Institute of Technology',
+    departmentOrClass: '2nd Year Robotics & Automation',
+    targetType: 'event',
+    targetId: 'evt-closed-1',
+    targetTitle: 'National Robo Combat League 2025',
+    teamName: 'Iron Valkyrie',
+    teamSize: 2,
+    teammateDetails: 'Meera Krishnan, Harish S',
+    experienceLevel: 'Intermediate',
+    timestamp: '2025-10-04 11:25:30',
+    status: 'confirmed',
+    attendanceRecorded: true,
+    attended: false,
+    attendance: 'absent'
   }
 ];
+
+export const initialHomepageStats: HomepageStat[] = [
+  {
+    id: 'stat-workshops-planned',
+    title: 'Workshops Planned',
+    value: 'Coming Soon',
+    description: 'Hands-on robotics and IoT workshops are in preparation.',
+    order: 1,
+    updatedAt: '2026-10-22 00:00:00'
+  },
+  {
+    id: 'stat-student-registrations',
+    title: 'Student Registrations',
+    value: '0',
+    description: 'Be among the first to join our upcoming workshops.',
+    order: 2,
+    updatedAt: '2026-10-22 00:00:00'
+  },
+  {
+    id: 'stat-competitions',
+    title: 'Competitions',
+    value: '2',
+    description: 'Robo Sumo and Robo Soccer.',
+    order: 3,
+    updatedAt: '2026-10-22 00:00:00'
+  },
+  {
+    id: 'stat-our-focus',
+    title: 'Our Focus',
+    value: 'Robotics + IoT',
+    description: 'Building practical engineering skills through hands-on learning.',
+    order: 4,
+    updatedAt: '2026-10-22 00:00:00'
+  }
+];
+
+export const initialFooterAboutConfig: FooterAboutConfig = {
+  id: 'footerAbout',
+  teamName: "ALTRON'Z ROBOTICS TEAM & IOT",
+  shortDescription: "Student-driven robotics and autonomous engineering organization. We design competition-grade combat & soccer robots, build embedded IoT architectures, and conduct immersive STEM workshops for schools and colleges nationwide.",
+  establishedYear: '2022',
+  isEstablishedVerified: true,
+  subtitle: 'Robotics & Embedded Systems',
+
+  heroBadge: 'Engineering Identity & Pedagogy',
+  heroTitle: 'Forging Autonomous Excellence Through Hardware First',
+  heroDescription: "Founded by engineering undergraduates, ALTRON'Z ROBOTICS TEAM & IOT bridges the gap between textbook physics and high-stress competition robotics. We operate a dual mandate: competing at elite national tournaments and demystifying embedded hardware for thousands of school and college students through hands-on bootcamps.",
+  
+  missionTitle: 'Our Mission',
+  missionDescription: 'To build competitive, resilient autonomous machines that push mechatronics boundaries, while making cutting-edge embedded systems, robotics, and IoT accessible to every curious young mind regardless of background or prior experience.',
+  missionPoints: [
+    'Zero-compromise hardware immersion with real microcontrollers.',
+    'Free introductory STEM clinics for underprivileged high schools.',
+    'Open-source hardware repositories for competition teams.'
+  ],
+
+  visionTitle: 'Our Vision',
+  visionDescription: 'To establish an internationally recognized center of student engineering innovation where real-world problems in agriculture, disaster robotics, and industrial IoT are solved by undergraduate and school students working on tactile hardware.',
+  visionPoints: [
+    'Top-tier podium finishes in international Robocup leagues.',
+    'Incubating patentable hardware startups from team student projects.',
+    'Training 10,000+ certified young embedded engineers by 2028.'
+  ],
+
+  disciplines: [
+    {
+      id: 'disc-1',
+      number: 'DISCIPLINE 01',
+      disciplineNumber: 'DISCIPLINE 01',
+      title: 'Competition Robotics',
+      description: 'Design of combat sumo bots, holonomic omni-wheel soccer strikers, micro-mouse maze solvers, and aerial drones for timed circuit challenges.',
+      iconType: 'cpu'
+    },
+    {
+      id: 'disc-2',
+      number: 'DISCIPLINE 02',
+      disciplineNumber: 'DISCIPLINE 02',
+      title: 'Industrial IoT & Telemetry',
+      description: 'Low-power sensor telemetry using LoRaWAN, ESP-NOW, and MQTT with cloud dashboard pipelines for environmental monitoring and automated rovers.',
+      iconType: 'wrench'
+    },
+    {
+      id: 'disc-3',
+      number: 'DISCIPLINE 03',
+      disciplineNumber: 'DISCIPLINE 03',
+      title: 'Bare-Metal Embedded Firmware',
+      description: 'Low-level C programming on ARM Cortex-M microcontrollers, direct register access, interrupt service routines, DMA memory transfers, and FreeRTOS.',
+      iconType: 'award'
+    }
+  ],
+
+  competitionLinks: [
+    { id: 'cl-1', label: 'Robo Sumo (3kg Class)', targetView: 'sumo' },
+    { id: 'cl-2', label: 'Robo Soccer (Omni 2v2)', targetView: 'soccer' },
+    { id: 'cl-3', label: 'Micro-Mouse Maze Runner', targetView: 'events' },
+    { id: 'cl-4', label: 'Drone Obstacle Challenge', targetView: 'events' }
+  ],
+
+  workshopLinks: [
+    { id: 'wl-1', label: 'School STEM Workshops', targetView: 'workshops' },
+    { id: 'wl-2', label: 'College IoT & Telemetry', targetView: 'workshops' },
+    { id: 'wl-3', label: 'Bare-Metal ARM Firmware', targetView: 'workshops' },
+    { id: 'wl-4', label: 'Active Hardware Projects', targetView: 'projects' },
+    { id: 'wl-5', label: 'Bot Details & Blueprints', targetView: 'bot-details' },
+    { id: 'wl-6', label: 'Hall of Achievements', targetView: 'achievements' }
+  ],
+
+  labAddress: 'Robotics Innovation Center, Block 4, Tech Campus',
+  officialEmail: 'contact@altronz.org',
+  outreachEmail: 'workshops@altronz.org',
+  contactPhone: '+1 (555) 726-2687',
+  workingHours: 'Monday - Saturday: 08:30 AM - 08:00 PM',
+  visitingNotice: 'Prior visitor authorization is required for campus entry to inspect our testing benches and competition rings.',
+
+  copyrightText: "ALTRON'Z ROBOTICS TEAM & IOT. All rights reserved.",
+  copyrightYear: '2026',
+  footerLinks: [
+    { id: 'fl-1', label: 'Team Charter', targetView: 'about' },
+    { id: 'fl-2', label: 'Host a Workshop', targetView: 'contact' },
+    { id: 'fl-3', label: 'Staff Login', targetView: 'login' }
+  ]
+};
+
+export const initialContactPageConfig: ContactPageConfig = {
+  id: 'contactPage',
+  badge: "Get in Touch with ALTRON'Z ROBOTICS TEAM & IOT",
+  title: 'Connect, Collaborate & Host Workshops',
+  description: 'Whether you want to sponsor our competition squad, invite us to host a hardware workshop on your campus, or inquire about robotics rules, we are here to assist.',
+
+  contactItems: [
+    {
+      id: 'ci-address',
+      type: 'address',
+      label: 'Engineering Lab & Test Arena',
+      value: "ALTRON'Z Robotics Center, Block 4, Tech Innovation Campus, 400 Technology Way",
+      enabled: true,
+      isPlaceholder: true // Clearly flagged as unverified sample address
+    },
+    {
+      id: 'ci-email-official',
+      type: 'email',
+      label: 'Official Electronic Mail',
+      value: 'contact@altronz.org',
+      subValue: 'workshops@altronz.org (Outreach)',
+      link: 'mailto:contact@altronz.org',
+      enabled: true,
+      isPlaceholder: false
+    },
+    {
+      id: 'ci-phone',
+      type: 'phone',
+      label: 'Direct Voice Line',
+      value: '+1 (555) 726-2687 / +1 (555) ROBOTIC',
+      link: 'tel:+15557262687',
+      enabled: true,
+      isPlaceholder: true // Clearly flagged as sample 555 phone number
+    },
+    {
+      id: 'ci-hours',
+      type: 'hours',
+      label: 'Lab Working Hours',
+      value: 'Monday - Saturday: 08:30 AM - 08:00 PM',
+      enabled: true,
+      isPlaceholder: false
+    }
+  ],
+
+  showVisitingNotice: true,
+  visitingNoticeTitle: 'Notice for Visiting Delegations:',
+  visitingNoticeText: 'Prior visitor authorization is required for campus entry to inspect our testing benches and competition rings.',
+
+  enquirySectionTitle: 'Workshop & Partnership Enquiry',
+  enquirySectionDescription: 'Fill out the form below to receive a formal curriculum prospectus and fee quotation for your institution.',
+  submitButtonText: 'Transmit Official Enquiry',
+  successTitle: 'Enquiry Dispatched',
+  successMessage: 'Your workshop request has been received. Our team will review the curriculum tracks and contact you within 24-48 business hours.',
+
+  fieldLabels: {
+    institutionName: 'School / College / Organization Name',
+    contactPerson: 'Contact Person Name',
+    institutionCategory: 'Institution Category',
+    officialEmail: 'Official Email',
+    contactPhone: 'Contact Phone Number',
+    preferredTrack: 'Preferred Technical Track',
+    targetTimeline: 'Target Timeline / Preferred Date',
+    additionalDetails: 'Special Requirements & Workshop Scope'
+  },
+
+  institutionCategories: [
+    'Engineering College',
+    'High School',
+    'University',
+    'Organization / Corporate'
+  ],
+
+  technicalTracks: [
+    'Robotics & Microcontrollers',
+    'IoT & Wireless Telemetry',
+    'Bare-Metal ARM Firmware',
+    'Custom Integrated Bootcamps'
+  ]
+};
+
+

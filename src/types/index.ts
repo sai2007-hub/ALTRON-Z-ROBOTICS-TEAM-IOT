@@ -17,6 +17,7 @@ export interface EventItem {
   teamSize: string;
   status: 'published' | 'draft' | 'archived';
   published?: boolean;
+  whatsappInviteUrl?: string;
   posterUrl?: string;
   publicId?: string;
   secureUrl?: string;
@@ -161,7 +162,14 @@ export interface Registration {
   teammateDetails?: string;
   experienceLevel: 'Beginner' | 'Intermediate' | 'Advanced';
   timestamp: string;
-  status: 'confirmed' | 'pending' | 'waitlist';
+  status: 'confirmed' | 'pending' | 'waitlist' | 'archived';
+  attendanceRecorded?: boolean;
+  attended?: boolean;
+  attendance?: 'present' | 'absent' | 'excused' | 'unmarked';
+  certificateIssued?: boolean;
+  certificateId?: string;
+  archivedAt?: string;
+  archivedBy?: string;
 }
 
 export interface WorkshopEnquiry {
@@ -178,3 +186,136 @@ export interface WorkshopEnquiry {
   message: string;
   timestamp: string;
 }
+
+export interface HomepageStat {
+  id: string;
+  title: string;
+  value: string;
+  description: string;
+  order?: number;
+  updatedAt?: string;
+}
+
+export interface BotDocument {
+  id: string;
+  title: string;
+  description: string;
+  pdfUrl: string;
+  publicId?: string;
+  fileName?: string;
+  fileSize?: number;
+  botOrCompetition?: string;
+  status: 'published' | 'draft' | 'archived';
+  published?: boolean;
+  uploadedAt: string;
+  uploadedBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DisciplineItem {
+  id: string;
+  number: string;
+  disciplineNumber?: string;
+  title: string;
+  description: string;
+  iconType: 'cpu' | 'wrench' | 'award';
+}
+
+export interface FooterLinkItem {
+  id: string;
+  label: string;
+  targetView: string;
+  description?: string;
+  externalUrl?: string;
+}
+
+export interface FooterAboutConfig {
+  id?: string;
+  teamName: string;
+  shortDescription: string;
+  establishedYear: string;
+  isEstablishedVerified: boolean;
+  subtitle: string;
+
+  // About Page
+  heroBadge: string;
+  heroTitle: string;
+  heroDescription: string;
+  missionTitle: string;
+  missionDescription: string;
+  missionPoints: string[];
+  visionTitle: string;
+  visionDescription: string;
+  visionPoints: string[];
+  disciplines: DisciplineItem[];
+
+  // Footer Specific
+  competitionLinks: FooterLinkItem[];
+  workshopLinks: FooterLinkItem[];
+
+  // Laboratory Coordinates
+  labAddress: string;
+  officialEmail: string;
+  outreachEmail?: string;
+  contactPhone: string;
+  workingHours: string;
+  visitingNotice: string;
+
+  // Footer Copyright & Actions
+  copyrightText: string;
+  copyrightYear: string;
+  footerLinks: FooterLinkItem[];
+
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export interface ContactItem {
+  id: string;
+  type: 'address' | 'email' | 'phone' | 'hours' | 'custom';
+  label: string;
+  value: string;
+  subValue?: string;
+  link?: string;
+  enabled: boolean;
+  isPlaceholder?: boolean;
+}
+
+export interface ContactPageConfig {
+  id?: string;
+  badge: string;
+  title: string;
+  description: string;
+
+  contactItems: ContactItem[];
+
+  showVisitingNotice: boolean;
+  visitingNoticeTitle: string;
+  visitingNoticeText: string;
+
+  enquirySectionTitle: string;
+  enquirySectionDescription: string;
+  submitButtonText: string;
+  successTitle: string;
+  successMessage: string;
+
+  fieldLabels: {
+    institutionName: string;
+    contactPerson: string;
+    institutionCategory: string;
+    officialEmail: string;
+    contactPhone: string;
+    preferredTrack: string;
+    targetTimeline: string;
+    additionalDetails: string;
+  };
+
+  institutionCategories: string[];
+  technicalTracks: string[];
+
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+

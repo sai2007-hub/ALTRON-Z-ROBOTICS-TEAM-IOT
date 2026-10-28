@@ -11,6 +11,7 @@ export type PageView =
   | 'events'
   | 'workshops'
   | 'projects'
+  | 'bot-details'
   | 'achievements'
   | 'gallery'
   | 'team'
@@ -29,9 +30,24 @@ export const Navbar: React.FC<NavbarProps> = ({
   setCurrentView,
   onOpenRegister,
 }) => {
-  const { isAdmin, currentUser, logoutAdmin } = useApp();
+  const { isAdmin, currentUser, logoutAdmin, events } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [eventsDropdownOpen, setEventsDropdownOpen] = useState(false);
+
+  const isEventActive = (evt: any) => {
+    if (!evt) return false;
+    if (['evt-1', 'evt-2', 'evt-3', 'evt-4'].includes(evt.id)) return false;
+    if (evt.status !== 'published' && evt.published !== true) return false;
+    const statusStr = String(evt.status || '').toLowerCase();
+    if (statusStr === 'archived' || statusStr === 'closed' || statusStr === 'completed') return false;
+    if (evt.registrationDeadline) {
+      const deadline = new Date(evt.registrationDeadline).getTime();
+      if (!isNaN(deadline) && deadline < Date.now()) return false;
+    }
+    return true;
+  };
+
+  const activeCompetitions = events.filter(isEventActive);
 
   const handleNav = (view: PageView) => {
     setCurrentView(view);
@@ -95,35 +111,62 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'hover:text-white'
               }`}
             >
-              <span>Events</span>
+              <span>Competitions</span>
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
 
             {eventsDropdownOpen && (
               <div
                 onMouseLeave={() => setEventsDropdownOpen(false)}
-                className="absolute top-full left-0 w-52 py-2 mt-1 bg-[#0F1219] border border-zinc-800 rounded-lg shadow-xl shadow-black/60 z-50 animate-in fade-in duration-150"
+                className="absolute top-full left-0 w-64 py-2 mt-1 bg-[#0F1219] border border-zinc-800 rounded-lg shadow-xl shadow-black/60 z-50 animate-in fade-in duration-150"
               >
+                {activeCompetitions.length > 0 && (
+                  <>
+                    <div className="px-4 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                      Active Tournaments
+                    </div>
+                    {activeCompetitions.map((evt) => (
+                      <button
+                        key={evt.id}
+                        onClick={() => {
+                          if (evt.slug === 'robo-sumo') handleNav('sumo');
+                          else if (evt.slug === 'robo-soccer') handleNav('soccer');
+                          else handleNav('events');
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-colors block cursor-pointer"
+                      >
+                        <span className="font-semibold text-white truncate block">{evt.title}</span>
+                        <span className="block text-[10px] text-zinc-500 font-mono">
+                          {evt.category} Arena &bull; {evt.date}
+                        </span>
+                      </button>
+                    ))}
+                    <div className="h-px bg-zinc-800/80 my-1"></div>
+                  </>
+                )}
+
+                <button
+                  onClick={() => handleNav('events')}
+                  className="w-full text-left px-4 py-2 text-xs text-zinc-300 hover:text-red-400 hover:bg-zinc-800/60 transition-colors block cursor-pointer"
+                >
+                  <span className="font-semibold block">All Tournaments &amp; Challenges</span>
+                  <span className="block text-[10px] text-zinc-500">Live &amp; upcoming schedules</span>
+                </button>
+                <div className="h-px bg-zinc-800/80 my-1"></div>
+                <div className="px-4 py-1 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                  Technical Rulebooks
+                </div>
                 <button
                   onClick={() => handleNav('sumo')}
-                  className="w-full text-left px-4 py-2 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-colors block"
+                  className="w-full text-left px-4 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors block cursor-pointer"
                 >
-                  <span className="font-semibold text-white">Robo Sumo</span>
-                  <span className="block text-[10px] text-zinc-500">Flagship Combat Event</span>
+                  Robo Sumo Rulebook &amp; Dohyo Specs
                 </button>
                 <button
                   onClick={() => handleNav('soccer')}
-                  className="w-full text-left px-4 py-2 text-xs text-zinc-300 hover:text-white hover:bg-zinc-800/60 transition-colors block"
+                  className="w-full text-left px-4 py-1.5 text-xs text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-colors block cursor-pointer"
                 >
-                  <span className="font-semibold text-white">Robo Soccer</span>
-                  <span className="block text-[10px] text-zinc-500">Omni Tactical Match</span>
-                </button>
-                <div className="h-px bg-zinc-800/80 my-1"></div>
-                <button
-                  onClick={() => handleNav('events')}
-                  className="w-full text-left px-4 py-2 text-xs text-zinc-300 hover:text-red-400 hover:bg-zinc-800/60 transition-colors block"
-                >
-                  All Competitions & Rules
+                  Robo Soccer Rulebook &amp; Pitch Specs
                 </button>
               </div>
             )}
@@ -145,6 +188,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}
           >
             Projects
+          </button>
+
+          <button
+            onClick={() => handleNav('bot-details')}
+            className={`whitespace-nowrap shrink-0 transition-colors py-1 ${
+              currentView === 'bot-details' ? 'text-red-500 font-bold' : 'hover:text-white'
+            }`}
+          >
+            Bot Details
           </button>
 
           <button
@@ -294,42 +346,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Group 2: Competitions */}
           <div>
             <span className="text-[10px] font-mono font-bold text-red-500 uppercase tracking-widest block px-2 mb-1.5">
-              Competitions
+              Competitions &amp; Rulebooks
             </span>
             <div className="space-y-1">
-              <button
-                onClick={() => handleNav('sumo')}
-                className={`w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold rounded-lg text-left transition-colors cursor-pointer ${
-                  currentView === 'sumo'
-                    ? 'bg-red-600/15 border border-red-500/40 text-red-400 font-bold'
-                    : 'text-zinc-200 hover:bg-zinc-800/70 border border-transparent'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                  <span>Robo Sumo (3.0 kg Class)</span>
-                </span>
-                <span className="text-[10px] text-red-400 font-mono uppercase bg-red-950/60 px-1.5 py-0.5 rounded border border-red-900/60">
-                  Flagship
-                </span>
-              </button>
-
-              <button
-                onClick={() => handleNav('soccer')}
-                className={`w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold rounded-lg text-left transition-colors cursor-pointer ${
-                  currentView === 'soccer'
-                    ? 'bg-red-600/15 border border-red-500/40 text-red-400 font-bold'
-                    : 'text-zinc-200 hover:bg-zinc-800/70 border border-transparent'
-                }`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                  <span>Robo Soccer (2-vs-2 Omni)</span>
-                </span>
-                <span className="text-[10px] text-red-400 font-mono uppercase bg-red-950/60 px-1.5 py-0.5 rounded border border-red-900/60">
-                  Flagship
-                </span>
-              </button>
+              {activeCompetitions.map((evt) => (
+                <button
+                  key={evt.id}
+                  onClick={() => {
+                    if (evt.slug === 'robo-sumo') handleNav('sumo');
+                    else if (evt.slug === 'robo-soccer') handleNav('soccer');
+                    else handleNav('events');
+                  }}
+                  className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 text-xs font-semibold rounded-lg text-left transition-colors cursor-pointer text-zinc-200 hover:bg-zinc-800/70 border border-transparent"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    <span className="truncate">{evt.title}</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-mono">{evt.category}</span>
+                </button>
+              ))}
 
               <button
                 onClick={() => handleNav('events')}
@@ -341,7 +377,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <span className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-zinc-400" />
-                  <span>All Tournaments & Rulebooks</span>
+                  <span>All Tournaments &amp; Rulebooks</span>
                 </span>
                 <span className="text-zinc-500 text-xs">→</span>
               </button>
@@ -374,6 +410,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               >
                 <span>R&D Projects</span>
+              </button>
+
+              <button
+                onClick={() => handleNav('bot-details')}
+                className={`min-h-[44px] flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg text-left transition-colors cursor-pointer ${
+                  currentView === 'bot-details'
+                    ? 'bg-red-600/15 border border-red-500/40 text-red-400 font-bold'
+                    : 'text-zinc-300 hover:bg-zinc-800/70 border border-transparent'
+                }`}
+              >
+                <span>Bot Details &amp; Blueprints</span>
               </button>
 
               <button

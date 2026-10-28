@@ -4,6 +4,7 @@ import {
   addDoc,
   getDocs,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -159,7 +160,14 @@ export async function fetchRegistrationsFromFirestore(): Promise<Registration[]>
         teammateDetails: data.teammateDetails || undefined,
         experienceLevel: data.experienceLevel || 'Intermediate',
         timestamp: formattedDate,
-        status: data.status || 'confirmed',
+        status: (data.status as 'confirmed' | 'pending' | 'waitlist' | 'archived') || 'confirmed',
+        attendanceRecorded: typeof data.attendanceRecorded === 'boolean' ? data.attendanceRecorded : !!data.attendance,
+        attended: typeof data.attended === 'boolean' ? data.attended : data.attendance === 'present',
+        attendance: data.attendance || (data.attended ? 'present' : undefined),
+        certificateIssued: typeof data.certificateIssued === 'boolean' ? data.certificateIssued : !!data.certificateId,
+        certificateId: data.certificateId || undefined,
+        archivedAt: data.archivedAt || undefined,
+        archivedBy: data.archivedBy || undefined,
       });
     });
 
@@ -171,12 +179,66 @@ export async function fetchRegistrationsFromFirestore(): Promise<Registration[]>
 
 export async function updateRegistrationStatusInFirestore(
   regId: string,
-  newStatus: 'confirmed' | 'pending' | 'waitlist'
+  newStatus: 'confirmed' | 'pending' | 'waitlist' | 'archived'
 ): Promise<void> {
   const docPath = `registrations/${regId}`;
   try {
     const docRef = doc(db, 'registrations', regId);
     await updateDoc(docRef, { status: newStatus });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, docPath);
+  }
+}
+
+export async function archiveRegistrationInFirestore(
+  regId: string,
+  isArchived: boolean,
+  adminEmail?: string
+): Promise<void> {
+  const docPath = `registrations/${regId}`;
+  try {
+    const docRef = doc(db, 'registrations', regId);
+    const updates: any = {
+      status: isArchived ? 'archived' : 'confirmed',
+    };
+    if (isArchived) {
+      updates.archivedAt = new Date().toISOString();
+      if (adminEmail) updates.archivedBy = adminEmail;
+    } else {
+      updates.archivedAt = '';
+      updates.archivedBy = '';
+    }
+    await updateDoc(docRef, updates);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, docPath);
+  }
+}
+
+export async function deleteRegistrationFromFirestore(regId: string): Promise<void> {
+  const docPath = `registrations/${regId}`;
+  try {
+    const docRef = doc(db, 'registrations', regId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, docPath);
+  }
+}
+
+export async function updateRegistrationAttendanceAndCertInFirestore(
+  regId: string,
+  updates: {
+    attendanceRecorded?: boolean;
+    attended?: boolean;
+    attendance?: 'present' | 'absent' | 'excused' | 'unmarked';
+    certificateIssued?: boolean;
+    certificateId?: string;
+    status?: 'confirmed' | 'pending' | 'waitlist' | 'archived';
+  }
+): Promise<void> {
+  const docPath = `registrations/${regId}`;
+  try {
+    const docRef = doc(db, 'registrations', regId);
+    await updateDoc(docRef, updates);
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, docPath);
   }

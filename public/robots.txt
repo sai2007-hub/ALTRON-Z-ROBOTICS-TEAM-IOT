@@ -1,0 +1,14 @@
+# Robots.txt for ALTRON'Z ROBOTICS TEAM & IOT
+# Allows full indexing of public website pages, competitions, workshops, and project archives.
+# Restricts access to administrative console and authentication endpoints.
+
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /login
+Disallow: /*?*admin*
+
+# XML Sitemap
+# NOTE: Replace https://YOUR_PRODUCTION_DOMAIN with your live custom domain once configured.
+# If using AI Studio preview URL, search engines can locate sitemap at /sitemap.xml
+Sitemap: https://YOUR_PRODUCTION_DOMAIN/sitemap.xml

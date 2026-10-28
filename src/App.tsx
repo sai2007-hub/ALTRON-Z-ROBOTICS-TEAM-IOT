@@ -15,9 +15,11 @@ import { TeamPage } from './pages/TeamPage';
 import { ContactPage } from './pages/ContactPage';
 import { LoginPage } from './pages/LoginPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { BotDetailsPage } from './pages/BotDetailsPage';
 import { EventRegistrationModal } from './components/events/EventRegistrationModal';
 import { EnquiryModal } from './components/workshops/EnquiryModal';
 import { EventItem, WorkshopItem } from './types';
+import { SEOManager } from './components/common/SEOManager';
 
 function AppContent() {
   const { isAdmin } = useApp();
@@ -31,6 +33,7 @@ function AppContent() {
       'events',
       'workshops',
       'projects',
+      'bot-details',
       'achievements',
       'gallery',
       'team',
@@ -66,6 +69,7 @@ function AppContent() {
         'events',
         'workshops',
         'projects',
+        'bot-details',
         'achievements',
         'gallery',
         'team',
@@ -97,6 +101,9 @@ function AppContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#08090C] text-[#F3F4F6] selection:bg-red-600 selection:text-white">
+      {/* Dynamic SEO, Social Previews & Structured Data Manager */}
+      <SEOManager currentView={currentView} />
+
       {/* Top Navigation */}
       <Navbar
         currentView={currentView}
@@ -132,6 +139,7 @@ function AppContent() {
           />
         )}
         {currentView === 'projects' && <ProjectsPage />}
+        {currentView === 'bot-details' && <BotDetailsPage onOpenEnquiry={handleOpenEnquiry} />}
         {currentView === 'achievements' && <AchievementsPage />}
         {currentView === 'gallery' && <GalleryPage />}
         {currentView === 'team' && <TeamPage />}

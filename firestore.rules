@@ -24,11 +24,22 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // Admin helper: authenticated user exists in /admins collection or runtime bootstrap email
+    // Helper to verify if the authenticated user has one of the 5 authorized admin emails
+    function isApprovedAdminEmail() {
+      return request.auth.token.email in [
+        'ssmssai2007@gmail.com',
+        'praveenananth107@gmail.com',
+        'sheikramiz021@gmail.com',
+        'anzz63065@gmail.com',
+        'nowfalsiraj007@gmail.com'
+      ] && request.auth.token.email_verified == true;
+    }
+
+    // Admin helper: authenticated user exists in /admins collection or has an approved admin email
     function isAdmin() {
       return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        (request.auth.token.email == 'ssmssai2007@gmail.com' && request.auth.token.email_verified == true)
+        isApprovedAdminEmail() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
 
@@ -60,7 +71,14 @@ service cloud.firestore {
         'teammateDetails',
         'experienceLevel',
         'status',
-        'createdAt'
+        'createdAt',
+        'attendanceRecorded',
+        'attended',
+        'attendance',
+        'certificateIssued',
+        'certificateId',
+        'archivedAt',
+        'archivedBy'
       ]) &&
       data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 100 &&
       data.email is string && data.email.size() <= 120 && data.email.matches('^[^@]+@[^@]+\\.[^@]+$') &&
@@ -70,11 +88,18 @@ service cloud.firestore {
       data.targetType in ['event', 'workshop'] &&
       data.targetId is string && data.targetId.size() <= 64 &&
       data.targetTitle is string && data.targetTitle.size() <= 150 &&
-      data.status in ['confirmed', 'pending', 'waitlist'] &&
+      data.status in ['confirmed', 'pending', 'waitlist', 'archived'] &&
       (!('teamName' in data) || (data.teamName is string && data.teamName.size() <= 80)) &&
       (!('teamSize' in data) || (data.teamSize is number && data.teamSize >= 1 && data.teamSize <= 20)) &&
       (!('teammateDetails' in data) || (data.teammateDetails is string && data.teammateDetails.size() <= 300)) &&
-      (!('experienceLevel' in data) || (data.experienceLevel in ['Beginner', 'Intermediate', 'Advanced']));
+      (!('experienceLevel' in data) || (data.experienceLevel in ['Beginner', 'Intermediate', 'Advanced'])) &&
+      (!('attendanceRecorded' in data) || data.attendanceRecorded is bool) &&
+      (!('attended' in data) || data.attended is bool) &&
+      (!('attendance' in data) || (data.attendance is string && data.attendance.size() <= 20)) &&
+      (!('certificateIssued' in data) || data.certificateIssued is bool) &&
+      (!('certificateId' in data) || (data.certificateId is string && data.certificateId.size() <= 64)) &&
+      (!('archivedAt' in data) || (data.archivedAt is string && data.archivedAt.size() <= 50)) &&
+      (!('archivedBy' in data) || (data.archivedBy is string && data.archivedBy.size() <= 120));
     }
 
     // 1. Registrations Collection
@@ -88,7 +113,16 @@ service cloud.firestore {
       allow update: if isAdmin() &&
                        isValidRegistration(incoming()) &&
                        incoming().createdAt == existing().createdAt &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'status',
+                         'attendanceRecorded',
+                         'attended',
+                         'attendance',
+                         'certificateIssued',
+                         'certificateId',
+                         'archivedAt',
+                         'archivedBy'
+                       ]);
       allow delete: if isAdmin();
     }
 
@@ -99,58 +133,67 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
-    // 3. Photo Gallery Collection
+    // 3. Photo Gallery Collection (Public Showcase)
     match /gallery/{galleryId} {
-      allow get: if isValidId(galleryId) && (resource.data.published == true || isAdmin());
-      allow list: if resource.data.published == true || isAdmin();
-      allow create: if isAdmin() && isValidId(galleryId);
-      allow update: if isAdmin() && isValidId(galleryId);
-      allow delete: if isAdmin() && isValidId(galleryId);
+      allow get: if isValidId(galleryId);
+      allow list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(galleryId);
     }
 
-    // 4. Team Members Collection
+    // 4. Team Members Collection (Public Profiles)
     match /teamMembers/{memberId} {
-      allow get: if isValidId(memberId) && (resource.data.published == true || isAdmin());
-      allow list: if resource.data.published == true || isAdmin();
-      allow create: if isAdmin() && isValidId(memberId);
-      allow update: if isAdmin() && isValidId(memberId);
-      allow delete: if isAdmin() && isValidId(memberId);
+      allow get: if isValidId(memberId);
+      allow list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(memberId);
     }
 
-    // 5. Achievements & Awards Collection
+    // 5. Achievements & Awards Collection (Public Wins)
     match /achievements/{achievementId} {
-      allow get: if isValidId(achievementId) && (resource.data.published == true || isAdmin());
-      allow list: if resource.data.published == true || isAdmin();
-      allow create: if isAdmin() && isValidId(achievementId);
-      allow update: if isAdmin() && isValidId(achievementId);
-      allow delete: if isAdmin() && isValidId(achievementId);
+      allow get: if isValidId(achievementId);
+      allow list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(achievementId);
     }
 
-    // 6. R&D Projects Collection
+    // 6. R&D Projects Collection (Public Showcase)
     match /projects/{projectId} {
-      allow get: if isValidId(projectId) && (resource.data.published == true || isAdmin());
-      allow list: if resource.data.published == true || isAdmin();
-      allow create: if isAdmin() && isValidId(projectId);
-      allow update: if isAdmin() && isValidId(projectId);
-      allow delete: if isAdmin() && isValidId(projectId);
+      allow get: if isValidId(projectId);
+      allow list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(projectId);
     }
 
-    // 7. Events Collection
+    // 7. Events Collection (Public Competitions)
     match /events/{eventId} {
-      allow get: if isValidId(eventId) && (resource.data.published == true || resource.data.status == 'published' || isAdmin());
-      allow list: if resource.data.published == true || resource.data.status == 'published' || isAdmin();
-      allow create: if isAdmin() && isValidId(eventId);
-      allow update: if isAdmin() && isValidId(eventId);
-      allow delete: if isAdmin() && isValidId(eventId);
+      allow get: if isValidId(eventId);
+      allow list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(eventId);
     }
 
-    // 8. Workshops Collection
+    // 8. Workshops Collection (Public Technical Tracks)
     match /workshops/{workshopId} {
-      allow get: if isValidId(workshopId) && (resource.data.published == true || resource.data.status == 'published' || isAdmin());
-      allow list: if resource.data.published == true || resource.data.status == 'published' || isAdmin();
-      allow create: if isAdmin() && isValidId(workshopId);
-      allow update: if isAdmin() && isValidId(workshopId);
-      allow delete: if isAdmin() && isValidId(workshopId);
+      allow get: if isValidId(workshopId);
+      allow list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(workshopId);
+    }
+
+    // 9. Homepage Statistics & Highlights
+    match /homepageStats/{statId} {
+      allow get: if isValidId(statId);
+      allow list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(statId);
+    }
+
+    // 10. Bot Details & Robot Documents (PDF Blueprints & Specifications)
+    match /botDocuments/{docId} {
+      allow get: if isValidId(docId);
+      allow list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(docId);
+    }
+
+    // 11. Site Content (Footer, About section, and Contact page dynamic configurations)
+    match /siteContent/{contentId} {
+      allow get: if isValidId(contentId);
+      allow list: if true;
+      allow create, update, delete: if isAdmin() && isValidId(contentId);
     }
   }
 }

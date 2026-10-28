@@ -1,38 +1,51 @@
 import React from 'react';
 import { PageView } from './Navbar';
-import { Mail, Phone, MapPin, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Mail, Phone, MapPin, ShieldCheck, Clock, Info } from 'lucide-react';
 import { AltronzLogo } from '../common/AltronzLogo';
+import { useApp } from '../../context/AppContext';
 
 interface FooterProps {
   setCurrentView: (view: PageView) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ setCurrentView }) => {
+  const { footerAboutConfig } = useApp();
+
   const handleNav = (view: PageView) => {
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleLinkClick = (targetView: string, externalUrl?: string) => {
+    if (externalUrl) {
+      window.open(externalUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    handleNav(targetView as PageView);
+  };
+
+  const displayYear = footerAboutConfig.copyrightYear || new Date().getFullYear().toString();
+
   return (
     <footer className="bg-[#050608] border-t border-white/5 text-zinc-400 text-xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
-          {/* Col 1: Wordmark & Mission */}
+          {/* Col 1: Wordmark & Identity */}
           <div className="lg:col-span-2 space-y-4">
             <button
               onClick={() => handleNav('home')}
               className="text-left focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none rounded-lg cursor-pointer"
-              title="ALTRON'Z ROBOTICS TEAM & IOT"
+              title={footerAboutConfig.teamName || "ALTRON'Z ROBOTICS TEAM & IOT"}
             >
               <AltronzLogo size="md" showSubtitle={true} />
             </button>
             <p className="text-xs text-zinc-400 leading-relaxed max-w-sm">
-              Student-driven robotics and autonomous engineering organization. We design competition-grade combat &amp; soccer robots, build embedded IoT architectures, and conduct immersive STEM workshops for schools and colleges nationwide.
+              {footerAboutConfig.shortDescription}
             </p>
             <div className="flex items-center gap-3 text-xs text-zinc-500 font-mono">
-              <span>EST. 2022</span>
+              <span>EST. {footerAboutConfig.establishedYear || '2022'}</span>
               <span>·</span>
-              <span>Robotics & Embedded Systems</span>
+              <span>{footerAboutConfig.subtitle || 'Robotics & Embedded Systems'}</span>
             </div>
           </div>
 
@@ -40,106 +53,82 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentView }) => {
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-white uppercase tracking-wider">Competitions</h4>
             <ul className="space-y-2">
-              <li>
-                <button
-                  onClick={() => handleNav('sumo')}
-                  className="hover:text-red-400 transition-colors text-left"
-                >
-                  Robo Sumo (3kg Class)
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('soccer')}
-                  className="hover:text-red-400 transition-colors text-left"
-                >
-                  Robo Soccer (Omni 2v2)
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('events')}
-                  className="hover:text-red-400 transition-colors text-left"
-                >
-                  Micro-Mouse Maze Runner
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('events')}
-                  className="hover:text-red-400 transition-colors text-left"
-                >
-                  Drone Obstacle Challenge
-                </button>
-              </li>
+              {footerAboutConfig.competitionLinks && footerAboutConfig.competitionLinks.length > 0 ? (
+                footerAboutConfig.competitionLinks.map((link) => (
+                  <li key={link.id}>
+                    <button
+                      onClick={() => handleLinkClick(link.targetView, link.externalUrl)}
+                      className="hover:text-red-400 transition-colors text-left"
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li className="text-zinc-600 italic">No public competition listings</li>
+              )}
             </ul>
           </div>
 
           {/* Col 3: Workshops & Tech */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Workshops & R&D</h4>
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Workshops &amp; R&amp;D</h4>
             <ul className="space-y-2">
-              <li>
-                <button
-                  onClick={() => handleNav('workshops')}
-                  className="hover:text-red-400 transition-colors text-left"
-                >
-                  School STEM Workshops
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('workshops')}
-                  className="hover:text-red-400 transition-colors text-left"
-                >
-                  College IoT & Telemetry
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('workshops')}
-                  className="hover:text-red-400 transition-colors text-left"
-                >
-                  Bare-Metal ARM Firmware
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('projects')}
-                  className="hover:text-red-400 transition-colors text-left"
-                >
-                  Active Hardware Projects
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => handleNav('achievements')}
-                  className="hover:text-red-400 transition-colors text-left"
-                >
-                  Hall of Achievements
-                </button>
-              </li>
+              {footerAboutConfig.workshopLinks && footerAboutConfig.workshopLinks.length > 0 ? (
+                footerAboutConfig.workshopLinks.map((link) => (
+                  <li key={link.id}>
+                    <button
+                      onClick={() => handleLinkClick(link.targetView, link.externalUrl)}
+                      className="hover:text-red-400 transition-colors text-left"
+                    >
+                      {link.label}
+                    </button>
+                  </li>
+                ))
+              ) : (
+                <li className="text-zinc-600 italic">No workshop links</li>
+              )}
             </ul>
           </div>
 
-          {/* Col 4: Contact & Access */}
+          {/* Col 4: Laboratory & Inquiries */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Laboratory & Inquiries</h4>
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider">Laboratory &amp; Inquiries</h4>
             <div className="space-y-2 text-xs">
-              <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 shrink-0 text-red-500 mt-0.5" />
-                <span>Robotics Innovation Center, Block 4, Tech Campus</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Mail className="w-3.5 h-3.5 shrink-0 text-red-500" />
-                <a href="mailto:contact@altronz.org" className="hover:text-white">
-                  contact@altronz.org
-                </a>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="w-3.5 h-3.5 shrink-0 text-red-500" />
-                <span>+1 (555) 726-2687</span>
-              </div>
+              {footerAboutConfig.labAddress && (
+                <div className="flex items-start gap-2">
+                  <MapPin className="w-3.5 h-3.5 shrink-0 text-red-500 mt-0.5" />
+                  <span>{footerAboutConfig.labAddress}</span>
+                </div>
+              )}
+              {footerAboutConfig.officialEmail && (
+                <div className="flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                  <a href={`mailto:${footerAboutConfig.officialEmail}`} className="hover:text-white">
+                    {footerAboutConfig.officialEmail}
+                  </a>
+                </div>
+              )}
+              {footerAboutConfig.contactPhone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                  <a href={`tel:${footerAboutConfig.contactPhone.replace(/[^0-9+]/g, '')}`} className="hover:text-white">
+                    {footerAboutConfig.contactPhone}
+                  </a>
+                </div>
+              )}
+              {footerAboutConfig.workingHours && (
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                  <span className="text-zinc-400">{footerAboutConfig.workingHours}</span>
+                </div>
+              )}
+              {footerAboutConfig.visitingNotice && (
+                <div className="flex items-start gap-2 text-[11px] text-zinc-500 pt-1">
+                  <Info className="w-3 h-3 shrink-0 text-zinc-400 mt-0.5" />
+                  <span className="line-clamp-2">{footerAboutConfig.visitingNotice}</span>
+                </div>
+              )}
               <div className="pt-2">
                 <button
                   onClick={() => handleNav('login')}
@@ -156,20 +145,36 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentView }) => {
         {/* Bottom bar */}
         <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-zinc-500">
           <div>
-            © {new Date().getFullYear()} ALTRON&apos;Z ROBOTICS TEAM &amp; IOT. All rights reserved.
+            © {displayYear} {footerAboutConfig.copyrightText || `${footerAboutConfig.teamName}. All rights reserved.`}
           </div>
-          <div className="flex items-center gap-4">
-            <button onClick={() => handleNav('about')} className="hover:text-zinc-300">
-              Team Charter
-            </button>
-            <span>·</span>
-            <button onClick={() => handleNav('contact')} className="hover:text-zinc-300">
-              Host a Workshop
-            </button>
-            <span>·</span>
-            <button onClick={() => handleNav('login')} className="hover:text-zinc-300">
-              Staff Login
-            </button>
+          <div className="flex items-center gap-4 flex-wrap">
+            {footerAboutConfig.footerLinks && footerAboutConfig.footerLinks.length > 0 ? (
+              footerAboutConfig.footerLinks.map((link, idx) => (
+                <React.Fragment key={link.id || idx}>
+                  {idx > 0 && <span>·</span>}
+                  <button
+                    onClick={() => handleLinkClick(link.targetView, link.externalUrl)}
+                    className="hover:text-zinc-300"
+                  >
+                    {link.label}
+                  </button>
+                </React.Fragment>
+              ))
+            ) : (
+              <>
+                <button onClick={() => handleNav('about')} className="hover:text-zinc-300">
+                  Team Charter
+                </button>
+                <span>·</span>
+                <button onClick={() => handleNav('contact')} className="hover:text-zinc-300">
+                  Host a Workshop
+                </button>
+                <span>·</span>
+                <button onClick={() => handleNav('login')} className="hover:text-zinc-300">
+                  Staff Login
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

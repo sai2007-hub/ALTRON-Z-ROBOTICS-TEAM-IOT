@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <!-- 
+    XML Sitemap for ALTRON'Z ROBOTICS TEAM & IOT
+    Contains only real, publicly accessible pages.
+    Excludes admin operations, login portals, private registrations, and student records.
+    NOTE: Replace 'https://YOUR_PRODUCTION_DOMAIN' with your verified live production domain.
+  -->
+
+  <!-- Homepage -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://YOUR_PRODUCTION_DOMAIN/og-image.png</image:loc>
+      <image:title>ALTRON'Z ROBOTICS TEAM &amp; IOT - Official Engineering Platform</image:title>
+      <image:caption>Combat robotics, embedded systems, and hands-on STEM workshops</image:caption>
+    </image:image>
+  </url>
+
+  <!-- About Team & Mission -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#about</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Dedicated Flagship Competition: Robo Sumo 3.0 kg Class -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#sumo</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Dedicated Flagship Competition: Robo Soccer 2v2 Omni Tactical -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#soccer</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- All Tournaments & Rulebooks -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#events</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Robotics, IoT & Embedded Systems Workshops -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#workshops</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Hardware R&D Projects & Robot Builds -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#projects</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Championship Honors & Awards -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#achievements</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Photo Gallery & Media Archives -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#gallery</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Engineering Crew & Mentors -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#team</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Contact Coordinates & Workshop Booking -->
+  <url>
+    <loc>https://YOUR_PRODUCTION_DOMAIN/#contact</loc>
+    <lastmod>2026-10-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>

@@ -70,8 +70,38 @@
         },
         "status": {
           "type": "string",
-          "enum": ["confirmed", "pending", "waitlist"],
+          "enum": ["confirmed", "pending", "waitlist", "archived"],
           "description": "Verification status of the registration"
+        },
+        "attendanceRecorded": {
+          "type": "boolean",
+          "description": "Whether participant attendance has been marked"
+        },
+        "attended": {
+          "type": "boolean",
+          "description": "Whether the participant attended the event"
+        },
+        "attendance": {
+          "type": "string",
+          "enum": ["present", "absent", "excused", "unmarked"],
+          "description": "Specific attendance status code"
+        },
+        "certificateIssued": {
+          "type": "boolean",
+          "description": "Whether a completion or merit certificate was issued"
+        },
+        "certificateId": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Unique verified certificate credential ID"
+        },
+        "archivedAt": {
+          "type": "string",
+          "description": "Timestamp when registration was soft-deleted or archived"
+        },
+        "archivedBy": {
+          "type": "string",
+          "description": "Admin email who performed the archive"
         },
         "createdAt": {
           "type": "string",
@@ -206,6 +236,49 @@
         "published": { "type": "boolean" }
       },
       "required": ["title", "slug", "published"]
+    },
+    "HomepageStat": {
+      "title": "HomepageStat",
+      "description": "Configurable metric or highlight item displayed on the homepage",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "value": { "type": "string", "minLength": 1, "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 250 },
+        "order": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "value"]
+    },
+    "BotDocument": {
+      "title": "BotDocument",
+      "description": "PDF documents, technical specifications, and blueprints for robots or competitions",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 500 },
+        "pdfUrl": { "type": "string" },
+        "publicId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "number" },
+        "botOrCompetition": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["published", "draft", "archived"] },
+        "published": { "type": "boolean" },
+        "uploadedAt": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "pdfUrl", "status"]
+    },
+    "SiteContent": {
+      "title": "SiteContent",
+      "description": "Dynamic configurations for Footer, About section, and Contact page",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -256,6 +329,24 @@
         "$ref": "#/entities/Workshop"
       },
       "description": "Institutional robotics and IoT workshop tracks"
+    },
+    "/homepageStats/{statId}": {
+      "schema": {
+        "$ref": "#/entities/HomepageStat"
+      },
+      "description": "Homepage statistics and performance metric cards displayed to visitors"
+    },
+    "/botDocuments/{docId}": {
+      "schema": {
+        "$ref": "#/entities/BotDocument"
+      },
+      "description": "Uploaded PDF documents, CAD schematics, and rule compliance specifications"
+    },
+    "/siteContent/{contentId}": {
+      "schema": {
+        "$ref": "#/entities/SiteContent"
+      },
+      "description": "Dynamic configurations for Footer, About section, and Contact page"
     }
   }
 }

@@ -95,12 +95,26 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
+// Approved 5 Administrator Accounts
+export const AUTHORIZED_ADMIN_EMAILS: readonly string[] = Object.freeze([
+  'ssmssai2007@gmail.com',
+  'praveenananth107@gmail.com',
+  'sheikramiz021@gmail.com',
+  'anzz63065@gmail.com',
+  'nowfalsiraj007@gmail.com',
+]);
+
+export function isAuthorizedAdminEmail(email?: string | null): boolean {
+  if (!email) return false;
+  return AUTHORIZED_ADMIN_EMAILS.includes(email.trim().toLowerCase());
+}
+
 // Check if authenticated user has admin privileges
 export async function checkIsAdmin(user: User | null): Promise<boolean> {
-  if (!user) return false;
+  if (!user || !user.email) return false;
 
-  // Runtime owner / bootstrap email
-  if (user.email === 'ssmssai2007@gmail.com') {
+  // Verify against approved 5 administrator emails
+  if (isAuthorizedAdminEmail(user.email)) {
     return true;
   }
 

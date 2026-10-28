@@ -77,7 +77,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ setCurrentView, onOpenRegi
             <span>Role-Based Access Control:</span>
           </div>
           <p className="text-[11px] text-zinc-500 leading-relaxed">
-            Admin privileges are strictly evaluated against the <code>/admins</code> collection in Cloud Firestore and verified security rules. Public registration submissions never grant administrative rights.
+            Admin privileges are strictly evaluated against authorized administrator credentials and verified Cloud Firestore security rules. Public student registrations never grant administrative rights.
           </p>
         </div>
 

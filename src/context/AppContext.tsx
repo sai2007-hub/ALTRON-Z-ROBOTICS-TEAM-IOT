@@ -8,6 +8,10 @@ import {
   TeamMember,
   Registration,
   WorkshopEnquiry,
+  HomepageStat,
+  BotDocument,
+  FooterAboutConfig,
+  ContactPageConfig,
 } from '../types';
 import {
   initialEvents,
@@ -17,7 +21,28 @@ import {
   initialGallery,
   initialTeamMembers,
   initialRegistrations,
+  initialHomepageStats,
+  initialFooterAboutConfig,
+  initialContactPageConfig,
 } from '../data/initialData';
+import {
+  fetchFooterAboutConfig,
+  saveFooterAboutConfig,
+  fetchContactPageConfig,
+  saveContactPageConfig,
+} from '../services/siteContentService';
+import {
+  fetchHomepageStatsFromFirestore,
+  saveHomepageStatToFirestore,
+  deleteHomepageStatFromFirestore,
+  syncAllHomepageStatsToFirestore,
+} from '../services/homepageStatsService';
+import {
+  fetchBotDocumentsFromFirestore,
+  saveBotDocumentToFirestore,
+  updateBotDocumentInFirestore,
+  deleteBotDocumentFromFirestore,
+} from '../services/botDocumentService';
 import {
   auth,
   googleProvider,
@@ -35,6 +60,9 @@ import {
   saveRegistrationToFirestore,
   fetchRegistrationsFromFirestore,
   updateRegistrationStatusInFirestore,
+  archiveRegistrationInFirestore,
+  deleteRegistrationFromFirestore,
+  updateRegistrationAttendanceAndCertInFirestore,
   RegistrationInput,
 } from '../services/registrationService';
 import {
@@ -109,11 +137,33 @@ interface AppContextType {
   addGalleryItem: (item: Omit<GalleryItem, 'id'>) => Promise<GalleryItem>;
   updateGalleryItem: (id: string, updates: Partial<GalleryItem>) => Promise<void>;
   deleteGalleryItem: (id: string, storagePath?: string) => Promise<void>;
-  updateRegistrationStatus: (id: string, status: 'confirmed' | 'pending' | 'waitlist') => Promise<void>;
-  exportRegistrationsCSV: () => void;
+  updateRegistrationStatus: (id: string, status: 'confirmed' | 'pending' | 'waitlist' | 'archived') => Promise<void>;
+  archiveRegistration: (id: string, isArchived: boolean) => Promise<void>;
+  deleteRegistration: (id: string) => Promise<void>;
+  bulkArchiveRegistrations: (ids: string[], isArchived: boolean) => Promise<{ count: number }>;
+  bulkDeleteRegistrations: (ids: string[]) => Promise<{ count: number }>;
+  updateRegistrationAttendance: (id: string, attendance: 'present' | 'absent' | 'excused' | 'unmarked') => Promise<void>;
+  updateRegistrationCertificate: (id: string, certificateId: string | null) => Promise<void>;
+  exportRegistrationsCSV: (customList?: Registration[]) => void;
   reloadFirestoreRegistrations: () => Promise<void>;
   refreshAllCMSData: () => Promise<void>;
   seedInitialDataToFirestore: () => Promise<{ success: boolean; count: number }>;
+  homepageStats: HomepageStat[];
+  updateHomepageStats: (stats: HomepageStat[]) => Promise<void>;
+  updateHomepageStat: (id: string, updates: Partial<HomepageStat>) => Promise<void>;
+  addHomepageStat: (stat: Omit<HomepageStat, 'id'>) => Promise<HomepageStat>;
+  deleteHomepageStat: (id: string) => Promise<void>;
+  resetHomepageStatsToDefault: () => Promise<void>;
+  botDocuments: BotDocument[];
+  addBotDocument: (doc: Omit<BotDocument, 'id'>) => Promise<BotDocument>;
+  updateBotDocument: (id: string, updates: Partial<BotDocument>) => Promise<void>;
+  deleteBotDocument: (id: string) => Promise<void>;
+  footerAboutConfig: FooterAboutConfig;
+  updateFooterAboutConfig: (config: FooterAboutConfig) => Promise<{ success: boolean; error?: string }>;
+  resetFooterAboutConfigToDefault: () => Promise<{ success: boolean; error?: string }>;
+  contactPageConfig: ContactPageConfig;
+  updateContactPageConfig: (config: ContactPageConfig) => Promise<{ success: boolean; error?: string }>;
+  resetContactPageConfigToDefault: () => Promise<{ success: boolean; error?: string }>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -121,7 +171,13 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [events, setEvents] = useState<EventItem[]>(() => {
     const saved = localStorage.getItem('altrons_events');
-    return saved ? JSON.parse(saved) : initialEvents;
+    if (!saved) return initialEvents;
+    try {
+      const parsed: EventItem[] = JSON.parse(saved);
+      return parsed.filter((e) => !['evt-1', 'evt-2', 'evt-3', 'evt-4'].includes(e.id));
+    } catch {
+      return initialEvents;
+    }
   });
 
   const [workshops, setWorkshops] = useState<WorkshopItem[]>(() => {
@@ -159,6 +215,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [homepageStats, setHomepageStats] = useState<HomepageStat[]>(() => {
+    const saved = localStorage.getItem('altrons_homepage_stats');
+    return saved ? JSON.parse(saved) : initialHomepageStats;
+  });
+
+  const [botDocuments, setBotDocuments] = useState<BotDocument[]>(() => {
+    const saved = localStorage.getItem('altrons_bot_documents');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [footerAboutConfig, setFooterAboutConfig] = useState<FooterAboutConfig>(() => {
+    const saved = localStorage.getItem('altrons_footer_about_config');
+    if (!saved) return initialFooterAboutConfig;
+    try {
+      return { ...initialFooterAboutConfig, ...JSON.parse(saved) };
+    } catch {
+      return initialFooterAboutConfig;
+    }
+  });
+
+  const [contactPageConfig, setContactPageConfig] = useState<ContactPageConfig>(() => {
+    const saved = localStorage.getItem('altrons_contact_page_config');
+    if (!saved) return initialContactPageConfig;
+    try {
+      return { ...initialContactPageConfig, ...JSON.parse(saved) };
+    } catch {
+      return initialContactPageConfig;
+    }
+  });
+
   // Firebase Auth State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -175,13 +261,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshAllCMSData = async () => {
     setCmsLoading(true);
     try {
-      const [galRes, tmRes, achRes, projRes, evtsRes, wsRes] = await Promise.allSettled([
+      const [galRes, tmRes, achRes, projRes, evtsRes, wsRes, statsRes, botDocsRes, footerAboutRes, contactRes] = await Promise.allSettled([
         fetchGalleryFromFirestore(false),
         fetchTeamMembersFromFirestore(false),
         fetchAchievementsFromFirestore(false),
         fetchProjectsFromFirestore(false),
         fetchEventsFromFirestore(false),
         fetchWorkshopsFromFirestore(false),
+        fetchHomepageStatsFromFirestore(),
+        fetchBotDocumentsFromFirestore(),
+        fetchFooterAboutConfig(),
+        fetchContactPageConfig(),
       ]);
 
       if (galRes.status === 'fulfilled' && galRes.value && galRes.value.length > 0) {
@@ -196,11 +286,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (projRes.status === 'fulfilled' && projRes.value && projRes.value.length > 0) {
         setProjects(projRes.value);
       }
-      if (evtsRes.status === 'fulfilled' && evtsRes.value && evtsRes.value.length > 0) {
-        setEvents(evtsRes.value);
+      if (evtsRes.status === 'fulfilled' && Array.isArray(evtsRes.value)) {
+        const cleanEvents = evtsRes.value.filter((e) => !['evt-1', 'evt-2', 'evt-3', 'evt-4'].includes(e.id));
+        setEvents(cleanEvents);
+        localStorage.setItem('altrons_events', JSON.stringify(cleanEvents));
       }
       if (wsRes.status === 'fulfilled' && wsRes.value && wsRes.value.length > 0) {
         setWorkshops(wsRes.value);
+      }
+      if (statsRes.status === 'fulfilled' && statsRes.value && statsRes.value.length > 0) {
+        setHomepageStats(statsRes.value);
+        localStorage.setItem('altrons_homepage_stats', JSON.stringify(statsRes.value));
+      }
+      if (botDocsRes.status === 'fulfilled' && Array.isArray(botDocsRes.value)) {
+        setBotDocuments(botDocsRes.value);
+        localStorage.setItem('altrons_bot_documents', JSON.stringify(botDocsRes.value));
+      }
+      if (footerAboutRes.status === 'fulfilled' && footerAboutRes.value) {
+        setFooterAboutConfig(footerAboutRes.value);
+      }
+      if (contactRes.status === 'fulfilled' && contactRes.value) {
+        setContactPageConfig(contactRes.value);
       }
     } catch (err) {
       console.warn('Could not load some CMS data from Firestore:', err);
@@ -275,6 +381,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('altrons_enquiries', JSON.stringify(workshopEnquiries));
   }, [workshopEnquiries]);
 
+  useEffect(() => {
+    localStorage.setItem('altrons_footer_about_config', JSON.stringify(footerAboutConfig));
+  }, [footerAboutConfig]);
+
+  useEffect(() => {
+    localStorage.setItem('altrons_contact_page_config', JSON.stringify(contactPageConfig));
+  }, [contactPageConfig]);
+
   // Auth Functions
   const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -284,7 +398,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await signOut(auth);
         return {
           success: false,
-          error: `Authenticated as ${res.user.email}, but this account is not registered in the /admins collection. Access denied.`,
+          error: `Access Denied: The account ${res.user.email} is not in the list of authorized administrators. Public student accounts cannot access operations console.`,
         };
       }
       return { success: true };
@@ -307,7 +421,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await signOut(auth);
         return {
           success: false,
-          error: `Signed in as ${res.user.email}, but this user does not possess administrative privileges in /admins.`,
+          error: `Access Denied: ${res.user.email} is not an authorized administrator account.`,
         };
       }
       return { success: true };
@@ -406,13 +520,139 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateRegistrationStatus = async (
     id: string,
-    status: 'confirmed' | 'pending' | 'waitlist'
+    status: 'confirmed' | 'pending' | 'waitlist' | 'archived'
   ) => {
     try {
       await updateRegistrationStatusInFirestore(id, status);
       setRegistrations((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
     } catch (err) {
       console.error('Failed to update status in Firestore:', err);
+      throw err;
+    }
+  };
+
+  const archiveRegistration = async (id: string, isArchived: boolean) => {
+    try {
+      await archiveRegistrationInFirestore(id, isArchived, currentUser?.email || undefined);
+      const timestamp = isArchived ? new Date().toISOString() : undefined;
+      setRegistrations((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                status: isArchived ? 'archived' : 'confirmed',
+                archivedAt: timestamp,
+                archivedBy: isArchived ? currentUser?.email || undefined : undefined,
+              }
+            : r
+        )
+      );
+    } catch (err) {
+      console.error('Failed to archive registration in Firestore:', err);
+      throw err;
+    }
+  };
+
+  const deleteRegistration = async (id: string) => {
+    try {
+      await deleteRegistrationFromFirestore(id);
+      setRegistrations((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      console.error('Failed to delete registration in Firestore:', err);
+      throw err;
+    }
+  };
+
+  const bulkArchiveRegistrations = async (ids: string[], isArchived: boolean): Promise<{ count: number }> => {
+    let successCount = 0;
+    for (const id of ids) {
+      try {
+        await archiveRegistrationInFirestore(id, isArchived, currentUser?.email || undefined);
+        successCount++;
+      } catch (err) {
+        console.warn(`Failed to archive reg ${id}:`, err);
+      }
+    }
+    const timestamp = isArchived ? new Date().toISOString() : undefined;
+    setRegistrations((prev) =>
+      prev.map((r) =>
+        ids.includes(r.id)
+          ? {
+              ...r,
+              status: isArchived ? 'archived' : 'confirmed',
+              archivedAt: timestamp,
+              archivedBy: isArchived ? currentUser?.email || undefined : undefined,
+            }
+          : r
+      )
+    );
+    return { count: successCount };
+  };
+
+  const bulkDeleteRegistrations = async (ids: string[]): Promise<{ count: number }> => {
+    let successCount = 0;
+    for (const id of ids) {
+      try {
+        await deleteRegistrationFromFirestore(id);
+        successCount++;
+      } catch (err) {
+        console.warn(`Failed to delete reg ${id}:`, err);
+      }
+    }
+    setRegistrations((prev) => prev.filter((r) => !ids.includes(r.id)));
+    return { count: successCount };
+  };
+
+  const updateRegistrationAttendance = async (
+    id: string,
+    attendance: 'present' | 'absent' | 'excused' | 'unmarked'
+  ) => {
+    try {
+      const isPresent = attendance === 'present';
+      const isRecorded = attendance !== 'unmarked';
+      await updateRegistrationAttendanceAndCertInFirestore(id, {
+        attendance,
+        attended: isPresent,
+        attendanceRecorded: isRecorded,
+      });
+      setRegistrations((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                attendance,
+                attended: isPresent,
+                attendanceRecorded: isRecorded,
+              }
+            : r
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update attendance in Firestore:', err);
+      throw err;
+    }
+  };
+
+  const updateRegistrationCertificate = async (id: string, certificateId: string | null) => {
+    try {
+      const isIssued = !!certificateId && certificateId.trim().length > 0;
+      await updateRegistrationAttendanceAndCertInFirestore(id, {
+        certificateIssued: isIssued,
+        certificateId: isIssued ? certificateId!.trim() : '',
+      });
+      setRegistrations((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                certificateIssued: isIssued,
+                certificateId: isIssued ? certificateId!.trim() : undefined,
+              }
+            : r
+        )
+      );
+    } catch (err) {
+      console.error('Failed to update certificate in Firestore:', err);
       throw err;
     }
   };
@@ -441,8 +681,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   };
 
-  const exportRegistrationsCSV = () => {
-    if (registrations.length === 0) return;
+  const exportRegistrationsCSV = (customList?: Registration[]) => {
+    const dataset = customList || registrations;
+    if (dataset.length === 0) return;
     const headers = [
       'ID',
       'Student Name',
@@ -457,23 +698,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       'Teammates',
       'Experience Level',
       'Status',
+      'Attendance Recorded',
+      'Attendance Status',
+      'Certificate Issued',
+      'Certificate ID',
+      'Archived Date',
       'Registration Date',
     ];
 
-    const rows = registrations.map((r) => [
+    const rows = dataset.map((r) => [
       `"${r.id}"`,
-      `"${r.studentName.replace(/"/g, '""')}"`,
-      `"${r.email.replace(/"/g, '""')}"`,
-      `"${r.phone.replace(/"/g, '""')}"`,
-      `"${r.schoolOrCollege.replace(/"/g, '""')}"`,
-      `"${r.departmentOrClass.replace(/"/g, '""')}"`,
+      `"${(r.studentName || '').replace(/"/g, '""')}"`,
+      `"${(r.email || '').replace(/"/g, '""')}"`,
+      `"${(r.phone || '').replace(/"/g, '""')}"`,
+      `"${(r.schoolOrCollege || '').replace(/"/g, '""')}"`,
+      `"${(r.departmentOrClass || '').replace(/"/g, '""')}"`,
       `"${r.targetType}"`,
-      `"${r.targetTitle.replace(/"/g, '""')}"`,
+      `"${(r.targetTitle || '').replace(/"/g, '""')}"`,
       `"${(r.teamName || '').replace(/"/g, '""')}"`,
       `"${r.teamSize || 1}"`,
       `"${(r.teammateDetails || '').replace(/"/g, '""')}"`,
       `"${r.experienceLevel}"`,
       `"${r.status}"`,
+      `"${r.attendanceRecorded ? 'Yes' : 'No'}"`,
+      `"${r.attendance || (r.attended ? 'present' : 'unmarked')}"`,
+      `"${r.certificateIssued ? 'Yes' : 'No'}"`,
+      `"${(r.certificateId || '').replace(/"/g, '""')}"`,
+      `"${(r.archivedAt || '').replace(/"/g, '""')}"`,
       `"${r.timestamp}"`,
     ]);
 
@@ -808,12 +1059,148 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         count++;
       }
 
+      // Seed initial homepage stats
+      for (const stat of initialHomepageStats) {
+        await saveHomepageStatToFirestore(stat);
+        count++;
+      }
+
       await refreshAllCMSData();
       return { success: true, count };
     } catch (err) {
       console.error('Error seeding initial data to Firestore:', err);
       return { success: false, count };
     }
+  };
+
+  // ==========================================
+  // HOMEPAGE STATISTICS MANAGERS
+  // ==========================================
+  const updateHomepageStats = async (newStats: HomepageStat[]): Promise<void> => {
+    const sorted = newStats.map((s, idx) => ({ ...s, order: idx + 1 }));
+    setHomepageStats(sorted);
+    localStorage.setItem('altrons_homepage_stats', JSON.stringify(sorted));
+    if (isAdmin) {
+      try {
+        await syncAllHomepageStatsToFirestore(sorted);
+      } catch (err) {
+        console.warn('Could not sync stats to Firestore:', err);
+      }
+    }
+  };
+
+  const updateHomepageStat = async (id: string, updates: Partial<HomepageStat>): Promise<void> => {
+    let updatedStat: HomepageStat | undefined;
+    const updated = homepageStats.map((s) => {
+      if (s.id === id) {
+        updatedStat = { ...s, ...updates };
+        return updatedStat;
+      }
+      return s;
+    });
+    setHomepageStats(updated);
+    localStorage.setItem('altrons_homepage_stats', JSON.stringify(updated));
+    if (isAdmin && updatedStat) {
+      await saveHomepageStatToFirestore(updatedStat);
+    }
+  };
+
+  const addHomepageStat = async (stat: Omit<HomepageStat, 'id'>): Promise<HomepageStat> => {
+    const id = `stat-${Date.now()}`;
+    const newStat: HomepageStat = {
+      ...stat,
+      id,
+      order: homepageStats.length + 1,
+      updatedAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    };
+    const updated = [...homepageStats, newStat];
+    setHomepageStats(updated);
+    localStorage.setItem('altrons_homepage_stats', JSON.stringify(updated));
+    if (isAdmin) {
+      await saveHomepageStatToFirestore(newStat);
+    }
+    return newStat;
+  };
+
+  const deleteHomepageStat = async (id: string): Promise<void> => {
+    const updated = homepageStats.filter((s) => s.id !== id);
+    setHomepageStats(updated);
+    localStorage.setItem('altrons_homepage_stats', JSON.stringify(updated));
+    if (isAdmin) {
+      await deleteHomepageStatFromFirestore(id);
+    }
+  };
+
+  const resetHomepageStatsToDefault = async (): Promise<void> => {
+    setHomepageStats(initialHomepageStats);
+    localStorage.setItem('altrons_homepage_stats', JSON.stringify(initialHomepageStats));
+    if (isAdmin) {
+      await syncAllHomepageStatsToFirestore(initialHomepageStats);
+    }
+  };
+
+  const addBotDocument = async (docData: Omit<BotDocument, 'id'>): Promise<BotDocument> => {
+    const saved = await saveBotDocumentToFirestore(docData);
+    setBotDocuments((prev) => {
+      const updated = [saved, ...prev];
+      localStorage.setItem('altrons_bot_documents', JSON.stringify(updated));
+      return updated;
+    });
+    return saved;
+  };
+
+  const updateBotDocument = async (id: string, updates: Partial<BotDocument>): Promise<void> => {
+    await updateBotDocumentInFirestore(id, updates);
+    setBotDocuments((prev) => {
+      const updated = prev.map((d) => (d.id === id ? { ...d, ...updates } : d));
+      localStorage.setItem('altrons_bot_documents', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const deleteBotDocument = async (id: string): Promise<void> => {
+    await deleteBotDocumentFromFirestore(id);
+    setBotDocuments((prev) => {
+      const updated = prev.filter((d) => d.id !== id);
+      localStorage.setItem('altrons_bot_documents', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const updateFooterAboutConfig = async (
+    config: FooterAboutConfig
+  ): Promise<{ success: boolean; error?: string }> => {
+    const res = await saveFooterAboutConfig(config, currentUser?.email || 'admin');
+    if (res.success) {
+      setFooterAboutConfig(config);
+    }
+    return res;
+  };
+
+  const resetFooterAboutConfigToDefault = async (): Promise<{ success: boolean; error?: string }> => {
+    const res = await saveFooterAboutConfig(initialFooterAboutConfig, currentUser?.email || 'admin');
+    if (res.success) {
+      setFooterAboutConfig(initialFooterAboutConfig);
+    }
+    return res;
+  };
+
+  const updateContactPageConfig = async (
+    config: ContactPageConfig
+  ): Promise<{ success: boolean; error?: string }> => {
+    const res = await saveContactPageConfig(config, currentUser?.email || 'admin');
+    if (res.success) {
+      setContactPageConfig(config);
+    }
+    return res;
+  };
+
+  const resetContactPageConfigToDefault = async (): Promise<{ success: boolean; error?: string }> => {
+    const res = await saveContactPageConfig(initialContactPageConfig, currentUser?.email || 'admin');
+    if (res.success) {
+      setContactPageConfig(initialContactPageConfig);
+    }
+    return res;
   };
 
   return (
@@ -856,10 +1243,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateGalleryItem,
         deleteGalleryItem,
         updateRegistrationStatus,
+        archiveRegistration,
+        deleteRegistration,
+        bulkArchiveRegistrations,
+        bulkDeleteRegistrations,
+        updateRegistrationAttendance,
+        updateRegistrationCertificate,
         exportRegistrationsCSV,
         reloadFirestoreRegistrations,
         refreshAllCMSData,
         seedInitialDataToFirestore,
+        homepageStats,
+        updateHomepageStats,
+        updateHomepageStat,
+        addHomepageStat,
+        deleteHomepageStat,
+        resetHomepageStatsToDefault,
+        botDocuments,
+        addBotDocument,
+        updateBotDocument,
+        deleteBotDocument,
+        footerAboutConfig,
+        updateFooterAboutConfig,
+        resetFooterAboutConfigToDefault,
+        contactPageConfig,
+        updateContactPageConfig,
+        resetContactPageConfigToDefault,
       }}
     >
       {children}

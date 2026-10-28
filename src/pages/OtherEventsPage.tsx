@@ -12,6 +12,7 @@ import {
   Shield,
   Layers,
   CheckCircle,
+  Trophy,
 } from 'lucide-react';
 
 interface OtherEventsPageProps {
@@ -29,9 +30,22 @@ export const OtherEventsPage: React.FC<OtherEventsPageProps> = ({
 
   const categories = ['All', 'Combat', 'Sports', 'Autonomous', 'Aerial'];
 
+  const isEventActive = (evt: EventItem) => {
+    if (!evt) return false;
+    if (['evt-1', 'evt-2', 'evt-3', 'evt-4'].includes(evt.id)) return false;
+    if (evt.status !== 'published' && evt.published !== true) return false;
+    const statusStr = String(evt.status || '').toLowerCase();
+    if (statusStr === 'archived' || statusStr === 'closed' || statusStr === 'completed') return false;
+    if (evt.registrationDeadline) {
+      const deadline = new Date(evt.registrationDeadline).getTime();
+      if (!isNaN(deadline) && deadline < Date.now()) return false;
+    }
+    return true;
+  };
+
   const visibleEvents = isAdmin
-    ? events
-    : events.filter((e) => e.status === 'published' || (e.status !== 'draft' && e.published !== false));
+    ? events.filter((e) => !['evt-1', 'evt-2', 'evt-3', 'evt-4'].includes(e.id))
+    : events.filter(isEventActive);
 
   const filteredEvents =
     selectedCategory === 'All'
@@ -55,25 +69,36 @@ export const OtherEventsPage: React.FC<OtherEventsPageProps> = ({
         </div>
 
         {/* Filter Segmented Control */}
-        <div className="flex items-center gap-1 p-1 bg-[#12151F] border border-zinc-800 rounded-lg overflow-x-auto">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                selectedCategory === cat
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+        {visibleEvents.length > 0 && (
+          <div className="flex items-center gap-1 p-1 bg-[#12151F] border border-zinc-800 rounded-lg overflow-x-auto">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  selectedCategory === cat
+                    ? 'bg-red-600 text-white shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Events Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      {/* Events Grid or Clean Empty Notice */}
+      {filteredEvents.length === 0 ? (
+        <div className="py-20 text-center space-y-3 bg-[#0A0D14] border border-zinc-800/60 rounded-2xl p-8 max-w-xl mx-auto">
+          <Trophy className="w-8 h-8 text-zinc-600 mx-auto" />
+          <h3 className="text-base font-bold text-zinc-200">No Active Tournaments Scheduled</h3>
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Tournaments for the upcoming season are currently being prepared by the coordinators. Published competitions will appear here automatically.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {filteredEvents.map((evt) => {
           const visualType =
             evt.slug === 'robo-sumo'
@@ -174,6 +199,7 @@ export const OtherEventsPage: React.FC<OtherEventsPageProps> = ({
           );
         })}
       </div>
+      )}
 
       {/* Individual Event Detail Modal */}
       {selectedEventModal && (

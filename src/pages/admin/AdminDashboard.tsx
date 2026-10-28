@@ -8,6 +8,13 @@ import {
   TeamMember,
   Registration,
   GalleryItem,
+  HomepageStat,
+  BotDocument,
+  FooterAboutConfig,
+  ContactPageConfig,
+  ContactItem,
+  FooterLinkItem,
+  DisciplineItem,
 } from '../../types';
 import {
   ShieldCheck,
@@ -46,6 +53,22 @@ import {
   Award,
   Upload,
   CloudUpload,
+  Archive,
+  ArchiveRestore,
+  CheckSquare,
+  Square,
+  AlertTriangle,
+  UserMinus,
+  Save,
+  ArrowUp,
+  ArrowDown,
+  Sliders,
+  FileText,
+  MapPin,
+  Phone,
+  Mail,
+  Clock,
+  RotateCcw,
 } from 'lucide-react';
 import { saveRegistrationToFirestore, fetchRegistrationsFromFirestore } from '../../services/registrationService';
 import { doc, setDoc } from 'firebase/firestore';
@@ -53,9 +76,14 @@ import { db } from '../../lib/firebase';
 import { RoboVisual } from '../../components/common/RoboVisual';
 import { ImageUploadField } from '../../components/common/ImageUploadField';
 import { testCloudinaryConnection } from '../../services/cloudinaryService';
+import { initialHomepageStats, initialFooterAboutConfig, initialContactPageConfig } from '../../data/initialData';
+import { validatePdfFile, uploadPdfDocument, MAX_PDF_SIZE_BYTES } from '../../services/botDocumentService';
 
 type AdminTab =
   | 'overview'
+  | 'homepage-stats'
+  | 'footer-about'
+  | 'contact-manager'
   | 'registrations'
   | 'gallery'
   | 'team'
@@ -63,6 +91,7 @@ type AdminTab =
   | 'projects'
   | 'events'
   | 'workshops'
+  | 'bot-documents'
   | 'enquiries'
   | 'firebase-architecture';
 
@@ -72,7 +101,7 @@ interface ToastNotification {
 }
 
 interface DeleteTarget {
-  type: 'gallery' | 'team' | 'achievement' | 'project' | 'event' | 'workshop';
+  type: 'gallery' | 'team' | 'achievement' | 'project' | 'event' | 'workshop' | 'bot-document';
   id: string;
   title: string;
   storagePath?: string;
@@ -110,16 +139,68 @@ export const AdminDashboard: React.FC = () => {
     updateGalleryItem,
     deleteGalleryItem,
     updateRegistrationStatus,
+    archiveRegistration,
+    deleteRegistration,
+    bulkArchiveRegistrations,
+    bulkDeleteRegistrations,
+    updateRegistrationAttendance,
+    updateRegistrationCertificate,
     exportRegistrationsCSV,
     reloadFirestoreRegistrations,
     refreshAllCMSData,
     seedInitialDataToFirestore,
+    homepageStats,
+    updateHomepageStats,
+    updateHomepageStat,
+    addHomepageStat,
+    deleteHomepageStat,
+    resetHomepageStatsToDefault,
+    botDocuments,
+    addBotDocument,
+    updateBotDocument,
+    deleteBotDocument,
+    footerAboutConfig,
+    updateFooterAboutConfig,
+    resetFooterAboutConfigToDefault,
+    contactPageConfig,
+    updateContactPageConfig,
+    resetContactPageConfigToDefault,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState<ToastNotification | null>(null);
+
+  // Homepage Statistics Editor State
+  const [editingStatsList, setEditingStatsList] = useState<HomepageStat[]>(homepageStats);
+  const [isStatsSaving, setIsStatsSaving] = useState(false);
+  const [showAddStatModal, setShowAddStatModal] = useState(false);
+  const [showStatsPreview, setShowStatsPreview] = useState(true);
+  const [newStatForm, setNewStatForm] = useState({ title: '', value: '', description: '' });
+  const [statDeleteTarget, setStatDeleteTarget] = useState<HomepageStat | null>(null);
+
+  React.useEffect(() => {
+    setEditingStatsList(homepageStats);
+  }, [homepageStats]);
+
+  // Footer & About Section Form State
+  const [footerAboutForm, setFooterAboutForm] = useState<FooterAboutConfig>(footerAboutConfig);
+  const [isFooterSaving, setIsFooterSaving] = useState(false);
+  const [footerSubTab, setFooterSubTab] = useState<'identity' | 'about' | 'disciplines' | 'columns' | 'coordinates' | 'copyright'>('identity');
+
+  // Contact Page Manager Form State
+  const [contactForm, setContactForm] = useState<ContactPageConfig>(contactPageConfig);
+  const [isContactSaving, setIsContactSaving] = useState(false);
+  const [contactSubTab, setContactSubTab] = useState<'heading' | 'coordinates' | 'visiting' | 'enquiry' | 'form-fields'>('heading');
+
+  React.useEffect(() => {
+    setFooterAboutForm(footerAboutConfig);
+  }, [footerAboutConfig]);
+
+  React.useEffect(() => {
+    setContactForm(contactPageConfig);
+  }, [contactPageConfig]);
 
   // Custom Delete Confirmation Modal State (replaces window.confirm)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -133,7 +214,25 @@ export const AdminDashboard: React.FC = () => {
   // Search & Filter state for registrations
   const [regSearchTerm, setRegSearchTerm] = useState('');
   const [regTargetFilter, setRegTargetFilter] = useState('All');
+  const [regEventStatusFilter, setRegEventStatusFilter] = useState<'all' | 'active' | 'closed' | 'archived'>('all');
+  const [selectedRegIds, setSelectedRegIds] = useState<string[]>([]);
   const [selectedRegDetail, setSelectedRegDetail] = useState<Registration | null>(null);
+  const [certInputVal, setCertInputVal] = useState('');
+
+  // Safe Removal & Archive Confirmation Modal state
+  const [removalModalState, setRemovalModalState] = useState<{
+    isOpen: boolean;
+    targetRegistrations: Registration[];
+    mode: 'single' | 'bulk';
+    isProcessing: boolean;
+    confirmPermanentDelete: boolean;
+  }>({
+    isOpen: false,
+    targetRegistrations: [],
+    mode: 'single',
+    isProcessing: false,
+    confirmPermanentDelete: false,
+  });
 
   // CMS Search & Filter states
   const [galleryCategoryFilter, setGalleryCategoryFilter] = useState('All');
@@ -217,6 +316,10 @@ export const AdminDashboard: React.FC = () => {
         case 'workshop':
           await deleteWorkshop(deleteTarget.id);
           showToast('success', `Deleted workshop "${deleteTarget.title}" from Firestore.`);
+          break;
+        case 'bot-document':
+          await deleteBotDocument(deleteTarget.id);
+          showToast('success', `Deleted bot blueprint "${deleteTarget.title}" from Firestore.`);
           break;
       }
       setDeleteTarget(null);
@@ -825,6 +928,7 @@ export const AdminDashboard: React.FC = () => {
     posterUrl: '',
     secureUrl: '',
     publicId: '',
+    whatsappInviteUrl: '',
   });
 
   const handleOpenAddEvent = () => {
@@ -848,6 +952,7 @@ export const AdminDashboard: React.FC = () => {
       posterUrl: '',
       secureUrl: '',
       publicId: '',
+      whatsappInviteUrl: '',
     });
     setIsEventModalOpen(true);
   };
@@ -874,6 +979,7 @@ export const AdminDashboard: React.FC = () => {
       posterUrl: poster,
       secureUrl: poster,
       publicId: evt.publicId || '',
+      whatsappInviteUrl: evt.whatsappInviteUrl || '',
     });
     setIsEventModalOpen(true);
   };
@@ -895,6 +1001,7 @@ export const AdminDashboard: React.FC = () => {
       .filter(Boolean);
 
     const finalPoster = eventFormData.secureUrl || eventFormData.posterUrl || '';
+    const finalWhatsAppUrl = eventFormData.whatsappInviteUrl ? eventFormData.whatsappInviteUrl.trim() : '';
 
     setIsSubmitting(true);
     try {
@@ -918,6 +1025,7 @@ export const AdminDashboard: React.FC = () => {
           posterUrl: finalPoster,
           secureUrl: finalPoster,
           publicId: eventFormData.publicId || '',
+          whatsappInviteUrl: finalWhatsAppUrl,
         });
         showToast('success', `Event "${eventFormData.title}" updated in Firestore!`);
       } else {
@@ -941,6 +1049,7 @@ export const AdminDashboard: React.FC = () => {
           posterUrl: finalPoster,
           secureUrl: finalPoster,
           publicId: eventFormData.publicId || '',
+          whatsappInviteUrl: finalWhatsAppUrl,
         });
         showToast('success', `Event "${eventFormData.title}" saved to Cloud Firestore!`);
       }
@@ -1118,6 +1227,170 @@ export const AdminDashboard: React.FC = () => {
   };
 
   // ==========================================
+  // 7. BOT DOCUMENTS CMS STATE & HANDLERS
+  // ==========================================
+  const [isBotDocModalOpen, setIsBotDocModalOpen] = useState(false);
+  const [editingBotDoc, setEditingBotDoc] = useState<BotDocument | null>(null);
+  const [botDocFormData, setBotDocFormData] = useState({
+    title: '',
+    description: '',
+    botOrCompetition: '',
+    published: true,
+    pdfUrl: '',
+    publicId: '',
+    fileName: '',
+    fileSize: 0,
+  });
+  const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
+  const [pdfUploadProgress, setPdfUploadProgress] = useState<number>(0);
+  const [pdfValidationError, setPdfValidationError] = useState<string | null>(null);
+  const [botDocSearchTerm, setBotDocSearchTerm] = useState('');
+  const [botDocStatusFilter, setBotDocStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
+
+  const handleOpenAddBotDoc = () => {
+    setEditingBotDoc(null);
+    setSelectedPdfFile(null);
+    setPdfValidationError(null);
+    setPdfUploadProgress(0);
+    setBotDocFormData({
+      title: '',
+      description: '',
+      botOrCompetition: '',
+      published: true,
+      pdfUrl: '',
+      publicId: '',
+      fileName: '',
+      fileSize: 0,
+    });
+    setIsBotDocModalOpen(true);
+  };
+
+  const handleOpenEditBotDoc = (doc: BotDocument) => {
+    setEditingBotDoc(doc);
+    setSelectedPdfFile(null);
+    setPdfValidationError(null);
+    setPdfUploadProgress(0);
+    setBotDocFormData({
+      title: doc.title,
+      description: doc.description,
+      botOrCompetition: doc.botOrCompetition || '',
+      published: doc.published !== false,
+      pdfUrl: doc.pdfUrl,
+      publicId: doc.publicId || '',
+      fileName: doc.fileName || 'document.pdf',
+      fileSize: doc.fileSize || 0,
+    });
+    setIsBotDocModalOpen(true);
+  };
+
+  const handlePdfFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validatePdfFile(file);
+    if (!validation.valid) {
+      setPdfValidationError(validation.error || 'Invalid PDF file.');
+      setSelectedPdfFile(null);
+      return;
+    }
+
+    setPdfValidationError(null);
+    setSelectedPdfFile(file);
+    if (!botDocFormData.title.trim()) {
+      const cleanName = file.name
+        .replace(/\.pdf$/i, '')
+        .replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      setBotDocFormData((prev) => ({ ...prev, title: cleanName }));
+    }
+  };
+
+  const handleSaveBotDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!botDocFormData.title.trim()) {
+      showToast('error', 'Document title is required.');
+      return;
+    }
+    if (!botDocFormData.description.trim()) {
+      showToast('error', 'Document description is required.');
+      return;
+    }
+
+    if (!editingBotDoc && !selectedPdfFile) {
+      showToast('error', 'Please select a valid PDF file to upload.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setPdfUploadProgress(10);
+    try {
+      let finalPdfUrl = botDocFormData.pdfUrl;
+      let finalPublicId = botDocFormData.publicId;
+      let finalFileName = botDocFormData.fileName;
+      let finalFileSize = botDocFormData.fileSize;
+
+      if (selectedPdfFile) {
+        const uploadRes = await uploadPdfDocument(selectedPdfFile, 'bot_documents', (progress) => {
+          setPdfUploadProgress(progress);
+        });
+        finalPdfUrl = uploadRes.pdfUrl;
+        finalPublicId = uploadRes.publicId;
+        finalFileName = uploadRes.fileName;
+        finalFileSize = uploadRes.fileSize;
+      }
+
+      if (editingBotDoc) {
+        await updateBotDocument(editingBotDoc.id, {
+          title: botDocFormData.title.trim(),
+          description: botDocFormData.description.trim(),
+          botOrCompetition: botDocFormData.botOrCompetition.trim(),
+          published: botDocFormData.published,
+          status: botDocFormData.published ? 'published' : 'draft',
+          pdfUrl: finalPdfUrl,
+          publicId: finalPublicId,
+          fileName: finalFileName,
+          fileSize: finalFileSize,
+        });
+        showToast('success', `Bot blueprint "${botDocFormData.title}" updated in Firestore!`);
+      } else {
+        await addBotDocument({
+          title: botDocFormData.title.trim(),
+          description: botDocFormData.description.trim(),
+          botOrCompetition: botDocFormData.botOrCompetition.trim(),
+          published: botDocFormData.published,
+          status: botDocFormData.published ? 'published' : 'draft',
+          pdfUrl: finalPdfUrl,
+          publicId: finalPublicId,
+          fileName: finalFileName,
+          fileSize: finalFileSize,
+          uploadedAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+          uploadedBy: currentUser?.email || 'admin',
+        });
+        showToast('success', `Bot blueprint "${botDocFormData.title}" uploaded and saved to Cloud Firestore!`);
+      }
+      setIsBotDocModalOpen(false);
+    } catch (err: any) {
+      showToast('error', `Failed to save bot document: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
+      setPdfUploadProgress(0);
+    }
+  };
+
+  const handleToggleBotDocPublished = async (docItem: BotDocument) => {
+    const nextPublished = !docItem.published;
+    try {
+      await updateBotDocument(docItem.id, {
+        published: nextPublished,
+        status: nextPublished ? 'published' : 'draft',
+      });
+      showToast('info', `Blueprint "${docItem.title}" is now ${nextPublished ? 'Published' : 'Draft (Admin only)'}.`);
+    } catch (err: any) {
+      showToast('error', `Could not update publish status: ${err.message}`);
+    }
+  };
+
+  // ==========================================
   // METRICS & FILTERS
   // ==========================================
   const totalRegistrations = registrations.length;
@@ -1126,22 +1399,193 @@ export const AdminDashboard: React.FC = () => {
   const totalCapacity = events.reduce((acc, curr) => acc + curr.capacity, 0);
   const totalSlotsFilled = events.reduce((acc, curr) => acc + curr.registeredCount, 0);
 
+  // Helper to determine if target event or workshop is Closed / Past
+  const isTargetClosed = (targetId: string, targetType: 'event' | 'workshop'): boolean => {
+    if (targetType === 'event') {
+      const evt = events.find((e) => e.id === targetId || e.slug === targetId);
+      if (!evt) return false;
+      if (evt.status === 'archived' || (evt as any).status === 'closed') return true;
+      if (evt.registrationDeadline) {
+        const deadline = Date.parse(evt.registrationDeadline);
+        if (!isNaN(deadline) && deadline < Date.now()) return true;
+      }
+      return false;
+    } else {
+      const ws = workshops.find((w) => w.id === targetId || w.slug === targetId);
+      if (!ws) return false;
+      return ws.status === 'completed' || ws.status === 'draft';
+    }
+  };
+
+  // Specific Registration Filter Counts
+  const activeRegistrationsCount = registrations.filter(
+    (r) => r.status !== 'archived' && !isTargetClosed(r.targetId, r.targetType)
+  ).length;
+
+  const closedRegistrationsCount = registrations.filter(
+    (r) => r.status !== 'archived' && isTargetClosed(r.targetId, r.targetType)
+  ).length;
+
+  const allRegistrationsCount = registrations.filter(
+    (r) => r.status !== 'archived'
+  ).length;
+
+  const archivedRegistrationsCount = registrations.filter(
+    (r) => r.status === 'archived'
+  ).length;
+
   // Filtered registrations
   const filteredRegistrations = registrations.filter((reg) => {
-    const matchesSearch =
-      reg.studentName.toLowerCase().includes(regSearchTerm.toLowerCase()) ||
-      reg.email.toLowerCase().includes(regSearchTerm.toLowerCase()) ||
-      reg.schoolOrCollege.toLowerCase().includes(regSearchTerm.toLowerCase()) ||
-      (reg.teamName && reg.teamName.toLowerCase().includes(regSearchTerm.toLowerCase()));
+    const isClosed = isTargetClosed(reg.targetId, reg.targetType);
 
+    // Event status filter: active vs closed vs archived vs all
+    if (regEventStatusFilter === 'active') {
+      if (reg.status === 'archived' || isClosed) return false;
+    } else if (regEventStatusFilter === 'closed') {
+      if (reg.status === 'archived' || !isClosed) return false;
+    } else if (regEventStatusFilter === 'archived') {
+      if (reg.status !== 'archived') return false;
+    } else if (regEventStatusFilter === 'all') {
+      if (reg.status === 'archived') return false;
+    }
+
+    // Specific Target Program Filter
     const matchesTarget =
       regTargetFilter === 'All' ||
       (regTargetFilter === 'events' && reg.targetType === 'event') ||
       (regTargetFilter === 'workshops' && reg.targetType === 'workshop') ||
       reg.targetId === regTargetFilter;
+    if (!matchesTarget) return false;
 
-    return matchesSearch && matchesTarget;
+    // Search query
+    if (regSearchTerm.trim()) {
+      const term = regSearchTerm.toLowerCase();
+      const matchesSearch =
+        (reg.studentName && reg.studentName.toLowerCase().includes(term)) ||
+        (reg.email && reg.email.toLowerCase().includes(term)) ||
+        (reg.phone && reg.phone.toLowerCase().includes(term)) ||
+        (reg.schoolOrCollege && reg.schoolOrCollege.toLowerCase().includes(term)) ||
+        (reg.targetTitle && reg.targetTitle.toLowerCase().includes(term)) ||
+        (reg.id && reg.id.toLowerCase().includes(term)) ||
+        (reg.teamName && reg.teamName.toLowerCase().includes(term)) ||
+        (reg.certificateId && reg.certificateId.toLowerCase().includes(term));
+      if (!matchesSearch) return false;
+    }
+
+    return true;
   });
+
+  // Multi-Selection and Removal Handlers
+  const handleOpenSingleRemoval = (reg: Registration) => {
+    setRemovalModalState({
+      isOpen: true,
+      targetRegistrations: [reg],
+      mode: 'single',
+      isProcessing: false,
+      confirmPermanentDelete: false,
+    });
+  };
+
+  const handleOpenBulkRemoval = () => {
+    const targets = registrations.filter((r) => selectedRegIds.includes(r.id));
+    if (targets.length === 0) return;
+    setRemovalModalState({
+      isOpen: true,
+      targetRegistrations: targets,
+      mode: 'bulk',
+      isProcessing: false,
+      confirmPermanentDelete: false,
+    });
+  };
+
+  const handleExecuteArchiveParticipants = async () => {
+    const targets = removalModalState.targetRegistrations;
+    if (targets.length === 0) return;
+    setRemovalModalState((prev) => ({ ...prev, isProcessing: true }));
+    try {
+      if (targets.length === 1) {
+        await archiveRegistration(targets[0].id, true);
+        showToast('success', `Archived ${targets[0].studentName}. Record preserved and can be recovered.`);
+      } else {
+        const res = await bulkArchiveRegistrations(
+          targets.map((t) => t.id),
+          true
+        );
+        showToast('success', `Archived ${res.count} participant(s). Records can be recovered from the Archived filter.`);
+      }
+      setSelectedRegIds((prev) => prev.filter((id) => !targets.some((t) => t.id === id)));
+      if (selectedRegDetail && targets.some((t) => t.id === selectedRegDetail.id)) {
+        setSelectedRegDetail((prev) => (prev ? { ...prev, status: 'archived' } : null));
+      }
+      setRemovalModalState({
+        isOpen: false,
+        targetRegistrations: [],
+        mode: 'single',
+        isProcessing: false,
+        confirmPermanentDelete: false,
+      });
+    } catch (err: any) {
+      showToast('error', `Failed to archive: ${err.message}`);
+      setRemovalModalState((prev) => ({ ...prev, isProcessing: false }));
+    }
+  };
+
+  const handleExecutePermanentDeleteParticipants = async () => {
+    const targets = removalModalState.targetRegistrations;
+    if (targets.length === 0) return;
+    setRemovalModalState((prev) => ({ ...prev, isProcessing: true }));
+    try {
+      if (targets.length === 1) {
+        await deleteRegistration(targets[0].id);
+        showToast('success', `Permanently deleted registration for ${targets[0].studentName}.`);
+      } else {
+        const res = await bulkDeleteRegistrations(targets.map((t) => t.id));
+        showToast('success', `Permanently deleted ${res.count} participant record(s) from Firestore.`);
+      }
+      setSelectedRegIds((prev) => prev.filter((id) => !targets.some((t) => t.id === id)));
+      if (selectedRegDetail && targets.some((t) => t.id === selectedRegDetail.id)) {
+        setSelectedRegDetail(null);
+      }
+      setRemovalModalState({
+        isOpen: false,
+        targetRegistrations: [],
+        mode: 'single',
+        isProcessing: false,
+        confirmPermanentDelete: false,
+      });
+    } catch (err: any) {
+      showToast('error', `Failed to delete registration(s): ${err.message}`);
+      setRemovalModalState((prev) => ({ ...prev, isProcessing: false }));
+    }
+  };
+
+  const handleRestoreParticipant = async (reg: Registration) => {
+    try {
+      await archiveRegistration(reg.id, false);
+      showToast('success', `Restored ${reg.studentName} back to active/closed roster.`);
+      if (selectedRegDetail && selectedRegDetail.id === reg.id) {
+        setSelectedRegDetail((prev) => (prev ? { ...prev, status: 'confirmed' } : null));
+      }
+    } catch (err: any) {
+      showToast('error', `Restore failed: ${err.message}`);
+    }
+  };
+
+  const handleToggleSelectAllVisible = () => {
+    const visibleIds = filteredRegistrations.map((r) => r.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedRegIds.includes(id));
+    if (allSelected) {
+      setSelectedRegIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+    } else {
+      setSelectedRegIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
+    }
+  };
+
+  const handleToggleSelectOne = (id: string) => {
+    setSelectedRegIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
 
   // Filtered gallery
   const filteredGallery = gallery.filter((item) => {
@@ -1388,7 +1832,7 @@ export const AdminDashboard: React.FC = () => {
           </h1>
           <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-zinc-400">
             <span>
-              Admin: <span className="text-zinc-200">{currentUser?.email || 'ssmssai2007@gmail.com'}</span>
+              Admin: <span className="text-zinc-200">{currentUser?.email || 'Authorized Administrator'}</span>
             </span>
             <span>·</span>
             <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
@@ -1419,7 +1863,7 @@ export const AdminDashboard: React.FC = () => {
             <span>Seed Sample Data</span>
           </button>
           <button
-            onClick={exportRegistrationsCSV}
+            onClick={() => exportRegistrationsCSV()}
             className="px-3.5 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg transition-colors flex items-center gap-2"
           >
             <Download className="w-3.5 h-3.5 text-red-500" />
@@ -1438,6 +1882,9 @@ export const AdminDashboard: React.FC = () => {
       <div className="flex items-center gap-2 p-1.5 bg-[#0C0F17] border border-zinc-800 rounded-xl overflow-x-auto">
         {[
           { id: 'overview', label: 'Overview', icon: BarChart3 },
+          { id: 'homepage-stats', label: `Homepage Stats (${homepageStats.length})`, icon: Sliders },
+          { id: 'footer-about', label: 'Footer & About CMS', icon: Layers },
+          { id: 'contact-manager', label: 'Contact Page Manager', icon: MapPin },
           { id: 'registrations', label: `Registrations (${registrations.length})`, icon: FileSpreadsheet },
           { id: 'gallery', label: `Photo Gallery (${gallery.length})`, icon: ImageIcon },
           { id: 'team', label: `Team Members (${teamMembers.length})`, icon: Users },
@@ -1445,6 +1892,7 @@ export const AdminDashboard: React.FC = () => {
           { id: 'projects', label: `R&D Projects (${projects.length})`, icon: Cpu },
           { id: 'events', label: `Events (${events.length})`, icon: Calendar },
           { id: 'workshops', label: `Workshops (${workshops.length})`, icon: Building },
+          { id: 'bot-documents', label: `Bot Documents (${botDocuments.length})`, icon: FileText },
           { id: 'enquiries', label: `Host Enquiries (${workshopEnquiries.length})`, icon: Settings },
           { id: 'firebase-architecture', label: 'Firebase & Tests', icon: Database },
         ].map((tab) => {
@@ -1594,133 +2042,2339 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
+      {/* TAB: HOMEPAGE CONTENT & STATISTICS MANAGER */}
+      {/* ========================================================================= */}
+      {activeTab === 'homepage-stats' && (
+        <div className="space-y-8">
+          {/* Header & Main Control Toolbar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[#0C0F17] border border-zinc-800 p-6 rounded-2xl shadow-xl">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-red-500" />
+                <h2 className="text-xl font-bold text-white tracking-tight">Homepage Statistics &amp; Metrics Manager</h2>
+                <span className="text-[11px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded">
+                  {editingStatsList.length} Metrics
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 max-w-2xl">
+                Configure the verified metrics, numbers, and descriptive context displayed on the public homepage. Changes are stored persistently in Firestore and synchronize in real-time for all site visitors.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowStatsPreview(!showStatsPreview)}
+                className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                  showStatsPreview
+                    ? 'bg-zinc-800 border-zinc-700 text-white'
+                    : 'bg-[#121520] border-zinc-800 text-zinc-400 hover:text-white'
+                }`}
+                title="Toggle live preview of homepage display"
+              >
+                {showStatsPreview ? <EyeOff className="w-3.5 h-3.5 text-zinc-400" /> : <Eye className="w-3.5 h-3.5 text-zinc-400" />}
+                <span>{showStatsPreview ? 'Hide Preview' : 'Show Preview'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm('Reset homepage statistics to verified initial values ("Workshops Planned", "Student Registrations", "Competitions", "Our Focus")?')) {
+                    setIsStatsSaving(true);
+                    try {
+                      await resetHomepageStatsToDefault();
+                      setEditingStatsList(initialHomepageStats);
+                      showToast('success', 'Reset homepage statistics to verified initial values.');
+                    } catch (err: any) {
+                      showToast('error', `Reset failed: ${err.message}`);
+                    } finally {
+                      setIsStatsSaving(false);
+                    }
+                  }
+                }}
+                disabled={isStatsSaving}
+                className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Reset to verified startup defaults"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Reset Defaults</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAddStatModal(true)}
+                className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-red-500" />
+                <span>Add Statistic</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsStatsSaving(true);
+                  try {
+                    await updateHomepageStats(editingStatsList);
+                    showToast('success', 'Saved all homepage statistics to Firestore successfully!');
+                  } catch (err: any) {
+                    showToast('error', `Save failed: ${err.message}`);
+                  } finally {
+                    setIsStatsSaving(false);
+                  }
+                }}
+                disabled={isStatsSaving}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2 shadow-sm shadow-red-600/30 cursor-pointer disabled:opacity-50"
+              >
+                {isStatsSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{isStatsSaving ? 'Saving to Firestore...' : 'Save All Changes'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Live Preview Box */}
+          {showStatsPreview && (
+            <div className="bg-[#0A0D14] border border-red-950/40 rounded-2xl p-6 sm:p-8 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[11px] font-mono text-zinc-300 uppercase tracking-wider font-semibold">
+                    Public Homepage Preview (Live Reactive Grid)
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-500">
+                  Matches desktop &amp; mobile responsive layout
+                </span>
+              </div>
+
+              {/* Exact Home.tsx Metrics Strip Simulation */}
+              <div
+                className={`grid grid-cols-2 ${
+                  editingStatsList.length >= 4
+                    ? 'md:grid-cols-4'
+                    : editingStatsList.length === 3
+                    ? 'md:grid-cols-3'
+                    : 'md:grid-cols-2'
+                } gap-6 pt-4`}
+              >
+                {editingStatsList.map((stat, idx) => (
+                  <div key={stat.id || idx} className="space-y-1.5 p-4 rounded-xl bg-[#0D1017] border border-zinc-800/80">
+                    <p className="text-2xl sm:text-3xl font-extrabold text-white font-mono tabular-nums tracking-tight">
+                      {stat.value || '—'}
+                    </p>
+                    <p className="text-xs text-zinc-300 font-semibold tracking-wide">
+                      {stat.title || 'Untitled Statistic'}
+                    </p>
+                    <p className="text-[11px] text-zinc-500 leading-relaxed">
+                      {stat.description || 'No description provided.'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* List of Editable Cards */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <span>Configured Metrics</span>
+                <span className="text-xs text-zinc-500 font-normal">
+                  (Adjust positions using arrow buttons)
+                </span>
+              </h3>
+            </div>
+
+            {editingStatsList.length === 0 ? (
+              <div className="p-12 text-center bg-[#0D1017] border border-dashed border-zinc-800 rounded-2xl space-y-3">
+                <Sliders className="w-8 h-8 text-zinc-600 mx-auto" />
+                <p className="text-sm font-semibold text-zinc-300">No Homepage Statistics Configured</p>
+                <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                  Click below to restore the verified initial metrics or create custom metrics.
+                </p>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingStatsList(initialHomepageStats)}
+                    className="px-3.5 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                  >
+                    Load Verified Defaults
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStatModal(true)}
+                    className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                  >
+                    Add Custom Statistic
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {editingStatsList.map((stat, index) => (
+                  <div
+                    key={stat.id}
+                    className="bg-[#0E121B] border border-zinc-800 hover:border-zinc-700/80 rounded-xl p-5 space-y-4 transition-all shadow-md flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      {/* Card Control Header */}
+                      <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-red-950/60 border border-red-800/50 text-red-400 font-mono text-[11px] flex items-center justify-center font-bold">
+                            {index + 1}
+                          </span>
+                          <span className="text-xs font-mono text-zinc-400">Position #{index + 1}</span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (index === 0) return;
+                              const copy = [...editingStatsList];
+                              const temp = copy[index - 1];
+                              copy[index - 1] = copy[index];
+                              copy[index] = temp;
+                              setEditingStatsList(copy);
+                            }}
+                            disabled={index === 0}
+                            className="p-1.5 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                            title="Move Up"
+                          >
+                            <ArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (index === editingStatsList.length - 1) return;
+                              const copy = [...editingStatsList];
+                              const temp = copy[index + 1];
+                              copy[index + 1] = copy[index];
+                              copy[index] = temp;
+                              setEditingStatsList(copy);
+                            }}
+                            disabled={index === editingStatsList.length - 1}
+                            className="p-1.5 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                            title="Move Down"
+                          >
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="h-4 w-px bg-zinc-800 mx-1" />
+                          <button
+                            type="button"
+                            onClick={() => setStatDeleteTarget(stat)}
+                            className="p-1.5 hover:bg-red-950/40 text-zinc-500 hover:text-red-400 rounded transition-colors cursor-pointer"
+                            title="Remove this statistic"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Input: Value */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-mono text-zinc-400 uppercase tracking-wide flex items-center justify-between">
+                          <span>Display Number / Metric</span>
+                          <span className="text-zinc-600 font-sans text-[10px]">e.g. Coming Soon, 0, 2</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={stat.value}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditingStatsList((prev) =>
+                              prev.map((s) => (s.id === stat.id ? { ...s, value: val } : s))
+                            );
+                          }}
+                          className="w-full px-3 py-2 bg-[#090C12] border border-zinc-800 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-lg text-white font-mono text-sm tracking-tight transition-colors"
+                          placeholder="e.g. Coming Soon"
+                        />
+                      </div>
+
+                      {/* Input: Title */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-mono text-zinc-400 uppercase tracking-wide">
+                          Title / Metric Label
+                        </label>
+                        <input
+                          type="text"
+                          value={stat.title}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditingStatsList((prev) =>
+                              prev.map((s) => (s.id === stat.id ? { ...s, title: val } : s))
+                            );
+                          }}
+                          className="w-full px-3 py-2 bg-[#090C12] border border-zinc-800 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-lg text-white text-xs font-semibold transition-colors"
+                          placeholder="e.g. Workshops Planned"
+                        />
+                      </div>
+
+                      {/* Input: Description */}
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-mono text-zinc-400 uppercase tracking-wide">
+                          Context / Brief Description
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={stat.description}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditingStatsList((prev) =>
+                              prev.map((s) => (s.id === stat.id ? { ...s, description: val } : s))
+                            );
+                          }}
+                          className="w-full px-3 py-2 bg-[#090C12] border border-zinc-800 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-lg text-zinc-300 text-xs transition-colors resize-none leading-relaxed"
+                          placeholder="Contextual explanation displayed below title"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Individual Save Button */}
+                    <div className="pt-3 border-t border-zinc-800/60 flex items-center justify-between text-xs">
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        {stat.updatedAt ? `Updated ${stat.updatedAt.slice(0, 16)}` : 'Verified Default'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await updateHomepageStat(stat.id, {
+                              title: stat.title,
+                              value: stat.value,
+                              description: stat.description,
+                            });
+                            showToast('success', `Saved "${stat.title}" successfully.`);
+                          } catch (err: any) {
+                            showToast('error', `Failed to save: ${err.message}`);
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Save className="w-3 h-3 text-red-400" />
+                        <span>Save Metric</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Modal: Add New Homepage Statistic */}
+          {showAddStatModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+              <div className="bg-[#10141E] border border-zinc-800 rounded-2xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-red-500" />
+                    <h3 className="text-base font-bold text-white">Add Homepage Statistic</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddStatModal(false)}
+                    className="p-1 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!newStatForm.title.trim() || !newStatForm.value.trim()) {
+                      showToast('error', 'Please provide both Title and Value for the statistic.');
+                      return;
+                    }
+                    try {
+                      const created = await addHomepageStat({
+                        title: newStatForm.title.trim(),
+                        value: newStatForm.value.trim(),
+                        description: newStatForm.description.trim(),
+                      });
+                      setEditingStatsList((prev) => [...prev, created]);
+                      setNewStatForm({ title: '', value: '', description: '' });
+                      setShowAddStatModal(false);
+                      showToast('success', `Added new statistic "${created.title}" successfully.`);
+                    } catch (err: any) {
+                      showToast('error', `Failed to add statistic: ${err.message}`);
+                    }
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="space-y-1">
+                    <label className="text-xs font-mono text-zinc-400 uppercase">
+                      Display Number / Metric <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newStatForm.value}
+                      onChange={(e) => setNewStatForm({ ...newStatForm, value: e.target.value })}
+                      placeholder="e.g. Coming Soon, 0, 10+, 99%"
+                      className="w-full px-3.5 py-2 bg-[#090C12] border border-zinc-800 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-lg text-white font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-mono text-zinc-400 uppercase">
+                      Title / Headline <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newStatForm.title}
+                      onChange={(e) => setNewStatForm({ ...newStatForm, title: e.target.value })}
+                      placeholder="e.g. Workshops Planned, Active Chapters"
+                      className="w-full px-3.5 py-2 bg-[#090C12] border border-zinc-800 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-lg text-white text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-mono text-zinc-400 uppercase">
+                      Description / Context
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={newStatForm.description}
+                      onChange={(e) => setNewStatForm({ ...newStatForm, description: e.target.value })}
+                      placeholder="Brief explanatory context displayed below title"
+                      className="w-full px-3.5 py-2 bg-[#090C12] border border-zinc-800 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-lg text-zinc-200 text-xs resize-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddStatModal(false)}
+                      className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Statistic</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal: Confirm Delete Homepage Statistic */}
+          {statDeleteTarget && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+              <div className="bg-[#121520] border border-zinc-800 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+                <div className="flex items-center gap-3 text-red-500">
+                  <AlertTriangle className="w-6 h-6 shrink-0" />
+                  <h3 className="text-base font-bold text-white">Remove Statistic?</h3>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Are you sure you want to remove the metric <strong className="text-white">&ldquo;{statDeleteTarget.title}&rdquo;</strong> (Value: <span className="font-mono text-red-400">{statDeleteTarget.value}</span>)? It will no longer appear on the public homepage.
+                </p>
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setStatDeleteTarget(null)}
+                    className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await deleteHomepageStat(statDeleteTarget.id);
+                        setEditingStatsList((prev) => prev.filter((s) => s.id !== statDeleteTarget.id));
+                        showToast('success', `Removed "${statDeleteTarget.title}".`);
+                      } catch (err: any) {
+                        showToast('error', `Failed to delete: ${err.message}`);
+                      } finally {
+                        setStatDeleteTarget(null);
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Confirm Removal</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: FOOTER & ABOUT SECTION CONTENT MANAGEMENT */}
+      {/* ========================================================================= */}
+      {activeTab === 'footer-about' && (
+        <div className="space-y-8">
+          {/* Header & Main Control Toolbar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[#0C0F17] border border-zinc-800 p-6 rounded-2xl shadow-xl">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-red-500" />
+                <h2 className="text-xl font-bold text-white tracking-tight">Footer &amp; About Section CMS</h2>
+                <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-2 py-0.5 rounded">
+                  Live Firestore Persistence
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 max-w-2xl">
+                Edit team identity, established year, About page hero/mission/vision, technical disciplines, footer competition &amp; workshop columns, lab coordinates, and copyright links.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setFooterAboutForm(footerAboutConfig)}
+                disabled={isFooterSaving}
+                className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Discard unsaved local changes and reload from store"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Discard Changes</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm('Reset Footer and About configuration to default verified values?')) {
+                    setIsFooterSaving(true);
+                    try {
+                      const res = await resetFooterAboutConfigToDefault();
+                      if (res.success) {
+                        setFooterAboutForm(initialFooterAboutConfig);
+                        showToast('success', 'Reset Footer & About configuration to initial verified defaults.');
+                      } else {
+                        showToast('error', `Reset failed: ${res.error}`);
+                      }
+                    } catch (err: any) {
+                      showToast('error', `Reset failed: ${err.message}`);
+                    } finally {
+                      setIsFooterSaving(false);
+                    }
+                  }
+                }}
+                disabled={isFooterSaving}
+                className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Reset to default initial configuration"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Reset Defaults</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsFooterSaving(true);
+                  try {
+                    const res = await updateFooterAboutConfig(footerAboutForm);
+                    if (res.success) {
+                      showToast('success', 'Footer & About content saved successfully to Firestore!');
+                    } else {
+                      showToast('error', `Save failed: ${res.error}`);
+                    }
+                  } catch (err: any) {
+                    showToast('error', `Save failed: ${err.message}`);
+                  } finally {
+                    setIsFooterSaving(false);
+                  }
+                }}
+                disabled={isFooterSaving}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-lg shadow-red-950/40"
+              >
+                {isFooterSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{isFooterSaving ? 'Saving to Firestore...' : 'Save Configuration'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-tab navigation for Footer & About */}
+          <div className="flex items-center gap-2 border-b border-zinc-800 pb-2 overflow-x-auto">
+            {[
+              { id: 'identity', label: 'Team Identity & Bio' },
+              { id: 'about', label: 'About Page (Hero & Bento)' },
+              { id: 'disciplines', label: 'Core Technical Disciplines' },
+              { id: 'columns', label: 'Footer Navigation Columns' },
+              { id: 'coordinates', label: 'Laboratory Coordinates' },
+              { id: 'copyright', label: 'Copyright & Footer Actions' },
+            ].map((st) => (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => setFooterSubTab(st.id as any)}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
+                  footerSubTab === st.id
+                    ? 'bg-zinc-800 text-white border border-zinc-700'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-900/50'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          {/* SUBTAB 1: Team Identity */}
+          {footerSubTab === 'identity' && (
+            <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-6">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Team Identity &amp; Branding</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Official Team Name</label>
+                  <input
+                    type="text"
+                    value={footerAboutForm.teamName}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, teamName: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Subtitle / Focus Area</label>
+                  <input
+                    type="text"
+                    value={footerAboutForm.subtitle}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, subtitle: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Established Year</label>
+                  <input
+                    type="text"
+                    value={footerAboutForm.establishedYear}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, establishedYear: e.target.value })}
+                    placeholder="e.g. 2022"
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white font-mono focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <input
+                    type="checkbox"
+                    id="isEstablishedVerified"
+                    checked={footerAboutForm.isEstablishedVerified !== false}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, isEstablishedVerified: e.target.checked })}
+                    className="rounded border-zinc-700 text-red-600 focus:ring-red-500"
+                  />
+                  <label htmlFor="isEstablishedVerified" className="text-zinc-300 font-medium cursor-pointer">
+                    Established year is verified and confirmed
+                  </label>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-zinc-400 font-medium mb-1">Short Description (Appears in Footer Wordmark)</label>
+                  <textarea
+                    rows={3}
+                    value={footerAboutForm.shortDescription}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, shortDescription: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 resize-none leading-relaxed"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 2: About Page Hero & Bento */}
+          {footerSubTab === 'about' && (
+            <div className="space-y-6">
+              <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-4">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">About Page Hero Section</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block text-zinc-400 font-medium mb-1">Hero Badge</label>
+                    <input
+                      type="text"
+                      value={footerAboutForm.heroBadge}
+                      onChange={(e) => setFooterAboutForm({ ...footerAboutForm, heroBadge: e.target.value })}
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 font-medium mb-1">Hero Title</label>
+                    <input
+                      type="text"
+                      value={footerAboutForm.heroTitle}
+                      onChange={(e) => setFooterAboutForm({ ...footerAboutForm, heroTitle: e.target.value })}
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-zinc-400 font-medium mb-1">Hero Description</label>
+                    <textarea
+                      rows={3}
+                      value={footerAboutForm.heroDescription}
+                      onChange={(e) => setFooterAboutForm({ ...footerAboutForm, heroDescription: e.target.value })}
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 leading-relaxed"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Mission Bento */}
+              <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-4">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Our Mission</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block text-zinc-400 font-medium mb-1">Mission Title</label>
+                    <input
+                      type="text"
+                      value={footerAboutForm.missionTitle}
+                      onChange={(e) => setFooterAboutForm({ ...footerAboutForm, missionTitle: e.target.value })}
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-zinc-400 font-medium mb-1">Mission Summary</label>
+                    <textarea
+                      rows={2}
+                      value={footerAboutForm.missionDescription}
+                      onChange={(e) => setFooterAboutForm({ ...footerAboutForm, missionDescription: e.target.value })}
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 leading-relaxed"
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="block text-zinc-400 font-medium">Mission Core Points</label>
+                    {(footerAboutForm.missionPoints || []).map((point, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={point}
+                          onChange={(e) => {
+                            const updated = [...(footerAboutForm.missionPoints || [])];
+                            updated[idx] = e.target.value;
+                            setFooterAboutForm({ ...footerAboutForm, missionPoints: updated });
+                          }}
+                          className="flex-1 bg-[#0A0C11] border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-red-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = footerAboutForm.missionPoints.filter((_, i) => i !== idx);
+                            setFooterAboutForm({ ...footerAboutForm, missionPoints: updated });
+                          }}
+                          className="p-1.5 text-zinc-500 hover:text-red-400 rounded transition-colors"
+                          title="Remove point"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFooterAboutForm({
+                          ...footerAboutForm,
+                          missionPoints: [...(footerAboutForm.missionPoints || []), 'New mission commitment point'],
+                        });
+                      }}
+                      className="text-xs text-red-400 hover:text-red-300 font-medium flex items-center gap-1 pt-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Mission Point</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vision Bento */}
+              <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-4">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Our Vision</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label className="block text-zinc-400 font-medium mb-1">Vision Title</label>
+                    <input
+                      type="text"
+                      value={footerAboutForm.visionTitle}
+                      onChange={(e) => setFooterAboutForm({ ...footerAboutForm, visionTitle: e.target.value })}
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-zinc-400 font-medium mb-1">Vision Summary</label>
+                    <textarea
+                      rows={2}
+                      value={footerAboutForm.visionDescription}
+                      onChange={(e) => setFooterAboutForm({ ...footerAboutForm, visionDescription: e.target.value })}
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 leading-relaxed"
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="block text-zinc-400 font-medium">Vision Key Targets</label>
+                    {(footerAboutForm.visionPoints || []).map((point, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={point}
+                          onChange={(e) => {
+                            const updated = [...(footerAboutForm.visionPoints || [])];
+                            updated[idx] = e.target.value;
+                            setFooterAboutForm({ ...footerAboutForm, visionPoints: updated });
+                          }}
+                          className="flex-1 bg-[#0A0C11] border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-red-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = footerAboutForm.visionPoints.filter((_, i) => i !== idx);
+                            setFooterAboutForm({ ...footerAboutForm, visionPoints: updated });
+                          }}
+                          className="p-1.5 text-zinc-500 hover:text-red-400 rounded transition-colors"
+                          title="Remove point"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFooterAboutForm({
+                          ...footerAboutForm,
+                          visionPoints: [...(footerAboutForm.visionPoints || []), 'New strategic vision milestone'],
+                        });
+                      }}
+                      className="text-xs text-red-400 hover:text-red-300 font-medium flex items-center gap-1 pt-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Vision Milestone</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 3: Core Technical Disciplines */}
+          {footerSubTab === 'disciplines' && (
+            <div className="space-y-4">
+              <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-6">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Three Core Technical Disciplines</h3>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    These three pillars are prominently featured on the public About page under Operational Pillars.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {footerAboutForm.disciplines.map((disc, idx) => (
+                    <div key={disc.id || idx} className="bg-[#121520] border border-zinc-800 p-5 rounded-xl space-y-4 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-red-500 font-bold uppercase text-[11px]">
+                          Pillar 0{idx + 1}
+                        </span>
+                        <select
+                          value={disc.iconType}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.disciplines];
+                            updated[idx] = { ...updated[idx], iconType: e.target.value as any };
+                            setFooterAboutForm({ ...footerAboutForm, disciplines: updated });
+                          }}
+                          className="bg-[#0A0C11] border border-zinc-700 rounded px-2 py-1 text-white text-[11px]"
+                        >
+                          <option value="cpu">Icon: CPU / Chip</option>
+                          <option value="wrench">Icon: Wrench / Hardware</option>
+                          <option value="award">Icon: Award / Trophy</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 text-[11px] font-medium mb-1">Badge Text</label>
+                        <input
+                          type="text"
+                          value={disc.disciplineNumber || disc.number || ''}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.disciplines];
+                            updated[idx] = {
+                              ...updated[idx],
+                              number: e.target.value,
+                              disciplineNumber: e.target.value,
+                            };
+                            setFooterAboutForm({ ...footerAboutForm, disciplines: updated });
+                          }}
+                          className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 text-[11px] font-medium mb-1">Discipline Title</label>
+                        <input
+                          type="text"
+                          value={disc.title}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.disciplines];
+                            updated[idx] = { ...updated[idx], title: e.target.value };
+                            setFooterAboutForm({ ...footerAboutForm, disciplines: updated });
+                          }}
+                          className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 text-[11px] font-medium mb-1">Detailed Description</label>
+                        <textarea
+                          rows={4}
+                          value={disc.description}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.disciplines];
+                            updated[idx] = { ...updated[idx], description: e.target.value };
+                            setFooterAboutForm({ ...footerAboutForm, disciplines: updated });
+                          }}
+                          className="w-full bg-[#0A0C11] border border-zinc-800 rounded p-2.5 text-white leading-relaxed resize-none"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 4: Footer Navigation Columns */}
+          {footerSubTab === 'columns' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Column 2: Competitions */}
+              <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Competitions Column</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = `cl-${Date.now()}`;
+                      setFooterAboutForm({
+                        ...footerAboutForm,
+                        competitionLinks: [
+                          ...footerAboutForm.competitionLinks,
+                          { id: newId, label: 'New Competition Name', targetView: 'events' },
+                        ],
+                      });
+                    }}
+                    className="text-xs text-red-400 hover:text-red-300 font-medium flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Link</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {footerAboutForm.competitionLinks.map((link, idx) => (
+                    <div key={link.id || idx} className="p-3 bg-[#121520] border border-zinc-800 rounded-lg space-y-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={link.label}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.competitionLinks];
+                            updated[idx] = { ...updated[idx], label: e.target.value };
+                            setFooterAboutForm({ ...footerAboutForm, competitionLinks: updated });
+                          }}
+                          className="flex-1 bg-[#0A0C11] border border-zinc-800 rounded px-2.5 py-1 text-white font-medium"
+                          placeholder="Link label"
+                        />
+                        <select
+                          value={link.targetView}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.competitionLinks];
+                            updated[idx] = { ...updated[idx], targetView: e.target.value };
+                            setFooterAboutForm({ ...footerAboutForm, competitionLinks: updated });
+                          }}
+                          className="bg-[#0A0C11] border border-zinc-800 rounded px-2 py-1 text-white text-[11px]"
+                        >
+                          <option value="home">Page: Home</option>
+                          <option value="events">Page: Competitions</option>
+                          <option value="sumo">Page: Sumo Bot</option>
+                          <option value="soccer">Page: Soccer Bot</option>
+                          <option value="workshops">Page: Workshops</option>
+                          <option value="projects">Page: Projects</option>
+                          <option value="achievements">Page: Achievements</option>
+                          <option value="bot-details">Page: Bot Details</option>
+                        </select>
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => {
+                            const updated = [...footerAboutForm.competitionLinks];
+                            const temp = updated[idx - 1];
+                            updated[idx - 1] = updated[idx];
+                            updated[idx] = temp;
+                            setFooterAboutForm({ ...footerAboutForm, competitionLinks: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"
+                          title="Move up"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === footerAboutForm.competitionLinks.length - 1}
+                          onClick={() => {
+                            const updated = [...footerAboutForm.competitionLinks];
+                            const temp = updated[idx + 1];
+                            updated[idx + 1] = updated[idx];
+                            updated[idx] = temp;
+                            setFooterAboutForm({ ...footerAboutForm, competitionLinks: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"
+                          title="Move down"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = footerAboutForm.competitionLinks.filter((_, i) => i !== idx);
+                            setFooterAboutForm({ ...footerAboutForm, competitionLinks: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-red-400"
+                          title="Remove link"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Column 3: Workshops & R&D */}
+              <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Workshops &amp; R&amp;D Column</h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = `wl-${Date.now()}`;
+                      setFooterAboutForm({
+                        ...footerAboutForm,
+                        workshopLinks: [
+                          ...footerAboutForm.workshopLinks,
+                          { id: newId, label: 'New Workshop Program', targetView: 'workshops' },
+                        ],
+                      });
+                    }}
+                    className="text-xs text-red-400 hover:text-red-300 font-medium flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Link</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {footerAboutForm.workshopLinks.map((link, idx) => (
+                    <div key={link.id || idx} className="p-3 bg-[#121520] border border-zinc-800 rounded-lg space-y-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={link.label}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.workshopLinks];
+                            updated[idx] = { ...updated[idx], label: e.target.value };
+                            setFooterAboutForm({ ...footerAboutForm, workshopLinks: updated });
+                          }}
+                          className="flex-1 bg-[#0A0C11] border border-zinc-800 rounded px-2.5 py-1 text-white font-medium"
+                          placeholder="Link label"
+                        />
+                        <select
+                          value={link.targetView}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.workshopLinks];
+                            updated[idx] = { ...updated[idx], targetView: e.target.value };
+                            setFooterAboutForm({ ...footerAboutForm, workshopLinks: updated });
+                          }}
+                          className="bg-[#0A0C11] border border-zinc-800 rounded px-2 py-1 text-white text-[11px]"
+                        >
+                          <option value="workshops">Page: Workshops</option>
+                          <option value="projects">Page: Projects</option>
+                          <option value="bot-details">Page: Bot Details</option>
+                          <option value="achievements">Page: Achievements</option>
+                          <option value="events">Page: Events</option>
+                          <option value="about">Page: About</option>
+                          <option value="contact">Page: Contact</option>
+                        </select>
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => {
+                            const updated = [...footerAboutForm.workshopLinks];
+                            const temp = updated[idx - 1];
+                            updated[idx - 1] = updated[idx];
+                            updated[idx] = temp;
+                            setFooterAboutForm({ ...footerAboutForm, workshopLinks: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"
+                          title="Move up"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === footerAboutForm.workshopLinks.length - 1}
+                          onClick={() => {
+                            const updated = [...footerAboutForm.workshopLinks];
+                            const temp = updated[idx + 1];
+                            updated[idx + 1] = updated[idx];
+                            updated[idx] = temp;
+                            setFooterAboutForm({ ...footerAboutForm, workshopLinks: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"
+                          title="Move down"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = footerAboutForm.workshopLinks.filter((_, i) => i !== idx);
+                            setFooterAboutForm({ ...footerAboutForm, workshopLinks: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-red-400"
+                          title="Remove link"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 5: Laboratory Coordinates */}
+          {footerSubTab === 'coordinates' && (
+            <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-6">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Laboratory Coordinates &amp; Inquiries</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="md:col-span-2">
+                  <label className="block text-zinc-400 font-medium mb-1">Physical Lab Address</label>
+                  <input
+                    type="text"
+                    value={footerAboutForm.labAddress}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, labAddress: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Official Electronic Mail</label>
+                  <input
+                    type="email"
+                    value={footerAboutForm.officialEmail}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, officialEmail: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Outreach / Workshops Email</label>
+                  <input
+                    type="email"
+                    value={footerAboutForm.outreachEmail || ''}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, outreachEmail: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Direct Voice Line / Telephone</label>
+                  <input
+                    type="text"
+                    value={footerAboutForm.contactPhone}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, contactPhone: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white font-mono focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Working Hours</label>
+                  <input
+                    type="text"
+                    value={footerAboutForm.workingHours}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, workingHours: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-zinc-400 font-medium mb-1">Visiting Instructions &amp; Delegation Notice</label>
+                  <textarea
+                    rows={2}
+                    value={footerAboutForm.visitingNotice}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, visitingNotice: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 resize-none leading-relaxed"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 6: Copyright & Footer Actions */}
+          {footerSubTab === 'copyright' && (
+            <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-6">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Footer Copyright &amp; Action Links</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Copyright Year</label>
+                  <input
+                    type="text"
+                    value={footerAboutForm.copyrightYear}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, copyrightYear: e.target.value })}
+                    placeholder="e.g. 2026"
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white font-mono focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Copyright Holder Text</label>
+                  <input
+                    type="text"
+                    value={footerAboutForm.copyrightText}
+                    onChange={(e) => setFooterAboutForm({ ...footerAboutForm, copyrightText: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div className="md:col-span-2 space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-zinc-400 font-medium">Bottom Action Links (e.g. Team Charter, Host a Workshop, Staff Login)</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newId = `fl-${Date.now()}`;
+                        setFooterAboutForm({
+                          ...footerAboutForm,
+                          footerLinks: [
+                            ...footerAboutForm.footerLinks,
+                            { id: newId, label: 'Custom Link', targetView: 'about' },
+                          ],
+                        });
+                      }}
+                      className="text-xs text-red-400 hover:text-red-300 font-medium flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Bottom Link</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {footerAboutForm.footerLinks.map((flink, idx) => (
+                      <div key={flink.id || idx} className="flex items-center gap-2 p-2.5 bg-[#121520] border border-zinc-800 rounded-lg">
+                        <input
+                          type="text"
+                          value={flink.label}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.footerLinks];
+                            updated[idx] = { ...updated[idx], label: e.target.value };
+                            setFooterAboutForm({ ...footerAboutForm, footerLinks: updated });
+                          }}
+                          className="flex-1 bg-[#0A0C11] border border-zinc-800 rounded px-2.5 py-1 text-white font-medium"
+                          placeholder="Link text"
+                        />
+                        <select
+                          value={flink.targetView}
+                          onChange={(e) => {
+                            const updated = [...footerAboutForm.footerLinks];
+                            updated[idx] = { ...updated[idx], targetView: e.target.value };
+                            setFooterAboutForm({ ...footerAboutForm, footerLinks: updated });
+                          }}
+                          className="bg-[#0A0C11] border border-zinc-800 rounded px-2 py-1 text-white text-[11px]"
+                        >
+                          <option value="about">View: Team Charter / About</option>
+                          <option value="contact">View: Host a Workshop / Contact</option>
+                          <option value="login">View: Staff Login</option>
+                          <option value="home">View: Home</option>
+                          <option value="events">View: Competitions</option>
+                          <option value="workshops">View: Workshops</option>
+                          <option value="projects">View: Projects</option>
+                          <option value="bot-details">View: Bot Details</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = footerAboutForm.footerLinks.filter((_, i) => i !== idx);
+                            setFooterAboutForm({ ...footerAboutForm, footerLinks: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-red-400"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: CONTACT PAGE CONTENT MANAGER */}
+      {/* ========================================================================= */}
+      {activeTab === 'contact-manager' && (
+        <div className="space-y-8">
+          {/* Header & Main Control Toolbar */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-[#0C0F17] border border-zinc-800 p-6 rounded-2xl shadow-xl">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-red-500" />
+                <h2 className="text-xl font-bold text-white tracking-tight">Contact Page Content Manager</h2>
+                <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-2 py-0.5 rounded">
+                  Live Firestore Persistence
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400 max-w-2xl">
+                Configure Contact Page introductory copy, laboratory coordinates, visiting notices, workshop inquiry section copy, and custom form field labels.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setContactForm(contactPageConfig)}
+                disabled={isContactSaving}
+                className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Discard unsaved local changes"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Discard Changes</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm('Reset Contact Page configuration to initial defaults?')) {
+                    setIsContactSaving(true);
+                    try {
+                      const res = await resetContactPageConfigToDefault();
+                      if (res.success) {
+                        setContactForm(initialContactPageConfig);
+                        showToast('success', 'Reset Contact Page configuration to initial defaults.');
+                      } else {
+                        showToast('error', `Reset failed: ${res.error}`);
+                      }
+                    } catch (err: any) {
+                      showToast('error', `Reset failed: ${err.message}`);
+                    } finally {
+                      setIsContactSaving(false);
+                    }
+                  }
+                }}
+                disabled={isContactSaving}
+                className="px-3 py-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                title="Reset to default initial configuration"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
+                <span>Reset Defaults</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsContactSaving(true);
+                  try {
+                    const res = await updateContactPageConfig(contactForm);
+                    if (res.success) {
+                      showToast('success', 'Contact Page configuration saved successfully to Firestore!');
+                    } else {
+                      showToast('error', `Save failed: ${res.error}`);
+                    }
+                  } catch (err: any) {
+                    showToast('error', `Save failed: ${err.message}`);
+                  } finally {
+                    setIsContactSaving(false);
+                  }
+                }}
+                disabled={isContactSaving}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-lg shadow-red-950/40"
+              >
+                {isContactSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{isContactSaving ? 'Saving to Firestore...' : 'Save Configuration'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Placeholder Warning Banner */}
+          {contactForm.contactItems.some((item) => item.isPlaceholder) && (
+            <div className="flex items-start gap-3 p-4 bg-amber-950/30 border border-amber-800/50 rounded-xl text-amber-200 text-xs leading-relaxed">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="block font-semibold text-amber-300">Unverified Placeholder Data Detected:</strong>
+                Some contact coordinates below are flagged with <span className="font-mono bg-amber-900/60 px-1 py-0.5 rounded text-[11px] text-amber-200">[UNVERIFIED PLACEHOLDER]</span> (such as sample telephone or sample campus address). Please review and update with real ALTRON&apos;Z information, or click &ldquo;Mark Verified&rdquo; once confirmed.
+              </div>
+            </div>
+          )}
+
+          {/* Sub-tab navigation for Contact Manager */}
+          <div className="flex items-center gap-2 border-b border-zinc-800 pb-2 overflow-x-auto">
+            {[
+              { id: 'heading', label: 'Page Heading & Intro' },
+              { id: 'coordinates', label: `Contact Coordinates (${contactForm.contactItems.length})` },
+              { id: 'visiting', label: 'Visiting Delegation Notice' },
+              { id: 'enquiry', label: 'Workshop Enquiry Section' },
+              { id: 'form-fields', label: 'Form Labels & Choices' },
+            ].map((st) => (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => setContactSubTab(st.id as any)}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
+                  contactSubTab === st.id
+                    ? 'bg-zinc-800 text-white border border-zinc-700'
+                    : 'text-zinc-400 hover:text-white hover:bg-zinc-900/50'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          {/* SUBTAB 1: Heading & Intro */}
+          {contactSubTab === 'heading' && (
+            <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-6">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Page Heading &amp; Introduction</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Top Badge Text</label>
+                  <input
+                    type="text"
+                    value={contactForm.badge}
+                    onChange={(e) => setContactForm({ ...contactForm, badge: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Page Title</label>
+                  <input
+                    type="text"
+                    value={contactForm.title}
+                    onChange={(e) => setContactForm({ ...contactForm, title: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-zinc-400 font-medium mb-1">Introduction Description</label>
+                  <textarea
+                    rows={3}
+                    value={contactForm.description}
+                    onChange={(e) => setContactForm({ ...contactForm, description: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 resize-none leading-relaxed"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 2: Contact Coordinates */}
+          {contactSubTab === 'coordinates' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-[#0C0F17] border border-zinc-800 p-4 rounded-xl">
+                <div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Contact Information Coordinates</h3>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Manage laboratory address, official email addresses, voice phone numbers, and operating hours.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newItem: ContactItem = {
+                      id: `ci-${Date.now()}`,
+                      type: 'custom',
+                      label: 'New Coordinate Label',
+                      value: 'Coordinate details here',
+                      enabled: true,
+                      isPlaceholder: false,
+                    };
+                    setContactForm({
+                      ...contactForm,
+                      contactItems: [...contactForm.contactItems, newItem],
+                    });
+                  }}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Coordinate</span>
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {contactForm.contactItems.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className={`p-4 rounded-xl border transition-all ${
+                      item.isPlaceholder
+                        ? 'bg-[#141113] border-amber-800/40'
+                        : item.enabled
+                        ? 'bg-[#0C0F17] border-zinc-800'
+                        : 'bg-[#080A0E] border-zinc-900 opacity-60'
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-zinc-800/80">
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={item.type}
+                          onChange={(e) => {
+                            const updated = [...contactForm.contactItems];
+                            updated[idx] = { ...updated[idx], type: e.target.value as any };
+                            setContactForm({ ...contactForm, contactItems: updated });
+                          }}
+                          className="bg-[#0A0C11] border border-zinc-700 rounded px-2.5 py-1 text-white text-xs font-mono"
+                        >
+                          <option value="address">Type: Address</option>
+                          <option value="email">Type: Email</option>
+                          <option value="phone">Type: Phone</option>
+                          <option value="hours">Type: Operating Hours</option>
+                          <option value="custom">Type: Custom</option>
+                        </select>
+
+                        {item.isPlaceholder && (
+                          <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-amber-950 text-amber-300 border border-amber-700/60">
+                            Unverified Placeholder
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = [...contactForm.contactItems];
+                            updated[idx] = { ...updated[idx], isPlaceholder: !updated[idx].isPlaceholder };
+                            setContactForm({ ...contactForm, contactItems: updated });
+                          }}
+                          className="text-[11px] text-zinc-400 hover:text-white underline cursor-pointer"
+                        >
+                          {item.isPlaceholder ? 'Mark as Verified' : 'Flag as Placeholder'}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5 text-xs text-zinc-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={item.enabled !== false}
+                            onChange={(e) => {
+                              const updated = [...contactForm.contactItems];
+                              updated[idx] = { ...updated[idx], enabled: e.target.checked };
+                              setContactForm({ ...contactForm, contactItems: updated });
+                            }}
+                            className="rounded border-zinc-700 text-red-600 focus:ring-red-500"
+                          />
+                          <span>Visible on Public Page</span>
+                        </label>
+
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => {
+                            const updated = [...contactForm.contactItems];
+                            const temp = updated[idx - 1];
+                            updated[idx - 1] = updated[idx];
+                            updated[idx] = temp;
+                            setContactForm({ ...contactForm, contactItems: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"
+                          title="Move up"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={idx === contactForm.contactItems.length - 1}
+                          onClick={() => {
+                            const updated = [...contactForm.contactItems];
+                            const temp = updated[idx + 1];
+                            updated[idx + 1] = updated[idx];
+                            updated[idx] = temp;
+                            setContactForm({ ...contactForm, contactItems: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"
+                          title="Move down"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = contactForm.contactItems.filter((_, i) => i !== idx);
+                            setContactForm({ ...contactForm, contactItems: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-red-400"
+                          title="Delete coordinate"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 text-xs">
+                      <div>
+                        <label className="block text-zinc-400 text-[11px] mb-1">Coordinate Label</label>
+                        <input
+                          type="text"
+                          value={item.label}
+                          onChange={(e) => {
+                            const updated = [...contactForm.contactItems];
+                            updated[idx] = { ...updated[idx], label: e.target.value };
+                            setContactForm({ ...contactForm, contactItems: updated });
+                          }}
+                          className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                          placeholder="e.g. Engineering Lab & Arena"
+                        />
+                      </div>
+
+                      <div className="lg:col-span-2">
+                        <label className="block text-zinc-400 text-[11px] mb-1">Primary Value</label>
+                        <input
+                          type="text"
+                          value={item.value}
+                          onChange={(e) => {
+                            const updated = [...contactForm.contactItems];
+                            updated[idx] = { ...updated[idx], value: e.target.value };
+                            setContactForm({ ...contactForm, contactItems: updated });
+                          }}
+                          className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                          placeholder="e.g. contact@altronz.org or Full Address"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 text-[11px] mb-1">Secondary / Sub-Value (Optional)</label>
+                        <input
+                          type="text"
+                          value={item.subValue || ''}
+                          onChange={(e) => {
+                            const updated = [...contactForm.contactItems];
+                            updated[idx] = { ...updated[idx], subValue: e.target.value };
+                            setContactForm({ ...contactForm, contactItems: updated });
+                          }}
+                          className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                          placeholder="e.g. workshops@altronz.org (Outreach)"
+                        />
+                      </div>
+
+                      <div className="lg:col-span-2">
+                        <label className="block text-zinc-400 text-[11px] mb-1">Custom Link URL (Optional)</label>
+                        <input
+                          type="text"
+                          value={item.link || ''}
+                          onChange={(e) => {
+                            const updated = [...contactForm.contactItems];
+                            updated[idx] = { ...updated[idx], link: e.target.value };
+                            setContactForm({ ...contactForm, contactItems: updated });
+                          }}
+                          className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white font-mono"
+                          placeholder="e.g. mailto:..., tel:..., https://..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 3: Visiting Delegation Notice */}
+          {contactSubTab === 'visiting' && (
+            <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Visiting Delegation Notice</h3>
+                <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={contactForm.showVisitingNotice !== false}
+                    onChange={(e) => setContactForm({ ...contactForm, showVisitingNotice: e.target.checked })}
+                    className="rounded border-zinc-700 text-red-600 focus:ring-red-500"
+                  />
+                  <span>Display Notice Box on Contact Page</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 text-xs">
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Notice Headline</label>
+                  <input
+                    type="text"
+                    value={contactForm.visitingNoticeTitle || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, visitingNoticeTitle: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Notice Content &amp; Instructions</label>
+                  <textarea
+                    rows={3}
+                    value={contactForm.visitingNoticeText || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, visitingNoticeText: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 resize-none leading-relaxed"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 4: Workshop Enquiry Section */}
+          {contactSubTab === 'enquiry' && (
+            <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-6">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Workshop &amp; Partnership Enquiry Section</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Section Title</label>
+                  <input
+                    type="text"
+                    value={contactForm.enquirySectionTitle}
+                    onChange={(e) => setContactForm({ ...contactForm, enquirySectionTitle: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Submit Button Text</label>
+                  <input
+                    type="text"
+                    value={contactForm.submitButtonText}
+                    onChange={(e) => setContactForm({ ...contactForm, submitButtonText: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-zinc-400 font-medium mb-1">Section Description / Sub-headline</label>
+                  <textarea
+                    rows={2}
+                    value={contactForm.enquirySectionDescription}
+                    onChange={(e) => setContactForm({ ...contactForm, enquirySectionDescription: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg p-3 text-white focus:outline-none focus:border-red-500 resize-none leading-relaxed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Success Title (After submission)</label>
+                  <input
+                    type="text"
+                    value={contactForm.successTitle}
+                    onChange={(e) => setContactForm({ ...contactForm, successTitle: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1">Success Message (After submission)</label>
+                  <input
+                    type="text"
+                    value={contactForm.successMessage}
+                    onChange={(e) => setContactForm({ ...contactForm, successMessage: e.target.value })}
+                    className="w-full bg-[#0A0C11] border border-zinc-800 rounded-lg px-3.5 py-2 text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 5: Form Labels & Choices */}
+          {contactSubTab === 'form-fields' && (
+            <div className="space-y-6">
+              <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-4">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Enquiry Form Field Labels</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                  <div>
+                    <label className="block text-zinc-400 text-[11px] mb-1">Institution Name Field Label</label>
+                    <input
+                      type="text"
+                      value={contactForm.fieldLabels?.institutionName || ''}
+                      onChange={(e) =>
+                        setContactForm({
+                          ...contactForm,
+                          fieldLabels: { ...contactForm.fieldLabels, institutionName: e.target.value },
+                        })
+                      }
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-[11px] mb-1">Contact Person Field Label</label>
+                    <input
+                      type="text"
+                      value={contactForm.fieldLabels?.contactPerson || ''}
+                      onChange={(e) =>
+                        setContactForm({
+                          ...contactForm,
+                          fieldLabels: { ...contactForm.fieldLabels, contactPerson: e.target.value },
+                        })
+                      }
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-[11px] mb-1">Institution Category Label</label>
+                    <input
+                      type="text"
+                      value={contactForm.fieldLabels?.institutionCategory || ''}
+                      onChange={(e) =>
+                        setContactForm({
+                          ...contactForm,
+                          fieldLabels: { ...contactForm.fieldLabels, institutionCategory: e.target.value },
+                        })
+                      }
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-[11px] mb-1">Official Email Label</label>
+                    <input
+                      type="text"
+                      value={contactForm.fieldLabels?.officialEmail || ''}
+                      onChange={(e) =>
+                        setContactForm({
+                          ...contactForm,
+                          fieldLabels: { ...contactForm.fieldLabels, officialEmail: e.target.value },
+                        })
+                      }
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-[11px] mb-1">Contact Phone Label</label>
+                    <input
+                      type="text"
+                      value={contactForm.fieldLabels?.contactPhone || ''}
+                      onChange={(e) =>
+                        setContactForm({
+                          ...contactForm,
+                          fieldLabels: { ...contactForm.fieldLabels, contactPhone: e.target.value },
+                        })
+                      }
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-[11px] mb-1">Preferred Track Label</label>
+                    <input
+                      type="text"
+                      value={contactForm.fieldLabels?.preferredTrack || ''}
+                      onChange={(e) =>
+                        setContactForm({
+                          ...contactForm,
+                          fieldLabels: { ...contactForm.fieldLabels, preferredTrack: e.target.value },
+                        })
+                      }
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-[11px] mb-1">Target Timeline Label</label>
+                    <input
+                      type="text"
+                      value={contactForm.fieldLabels?.targetTimeline || ''}
+                      onChange={(e) =>
+                        setContactForm({
+                          ...contactForm,
+                          fieldLabels: { ...contactForm.fieldLabels, targetTimeline: e.target.value },
+                        })
+                      }
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-zinc-400 text-[11px] mb-1">Additional Details Label</label>
+                    <input
+                      type="text"
+                      value={contactForm.fieldLabels?.additionalDetails || ''}
+                      onChange={(e) =>
+                        setContactForm({
+                          ...contactForm,
+                          fieldLabels: { ...contactForm.fieldLabels, additionalDetails: e.target.value },
+                        })
+                      }
+                      className="w-full bg-[#0A0C11] border border-zinc-800 rounded px-3 py-1.5 text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Institution Categories and Technical Tracks */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Institution Categories</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newCat = prompt('Enter new institution category label:');
+                        if (newCat && newCat.trim()) {
+                          setContactForm({
+                            ...contactForm,
+                            institutionCategories: [...(contactForm.institutionCategories || []), newCat.trim()],
+                          });
+                        }
+                      }}
+                      className="text-xs text-red-400 hover:text-red-300 font-medium flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Category</span>
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {(contactForm.institutionCategories || []).map((cat, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2.5 bg-[#121520] border border-zinc-800 rounded-lg text-xs">
+                        <span className="text-zinc-200">{cat}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = contactForm.institutionCategories.filter((_, i) => i !== idx);
+                            setContactForm({ ...contactForm, institutionCategories: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-red-400"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Technical Tracks</h3>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newTrk = prompt('Enter new technical track label:');
+                        if (newTrk && newTrk.trim()) {
+                          setContactForm({
+                            ...contactForm,
+                            technicalTracks: [...(contactForm.technicalTracks || []), newTrk.trim()],
+                          });
+                        }
+                      }}
+                      className="text-xs text-red-400 hover:text-red-300 font-medium flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Track</span>
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {(contactForm.technicalTracks || []).map((trk, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2.5 bg-[#121520] border border-zinc-800 rounded-lg text-xs">
+                        <span className="text-zinc-200">{trk}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = contactForm.technicalTracks.filter((_, i) => i !== idx);
+                            setContactForm({ ...contactForm, technicalTracks: updated });
+                          }}
+                          className="p-1 text-zinc-500 hover:text-red-400"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: STUDENT REGISTRATIONS */}
+      {/* ========================================================================= */}
+      {/* ========================================================================= */}
       {/* TAB 2: STUDENT REGISTRATIONS */}
       {/* ========================================================================= */}
       {activeTab === 'registrations' && (
         <div className="space-y-6">
+          {/* Header & Quick Action Buttons */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-lg font-bold text-white">Student Registrations Roster</h2>
-              <p className="text-xs text-zinc-400">
-                Live participant entries recorded in Cloud Firestore collection <code>/registrations</code>.
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-red-500" />
+                <h2 className="text-lg font-bold text-white">Student Registrations Roster</h2>
+              </div>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                Manage participants across active and closed events with attendance and certificate verification.
               </p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSyncFirestore}
                 disabled={isSyncing}
-                className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-xs text-zinc-300 font-semibold rounded-lg border border-zinc-700 flex items-center gap-1.5"
+                className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-xs text-zinc-300 font-semibold rounded-lg border border-zinc-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Synchronize records with Cloud Firestore"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                 <span>Refresh</span>
               </button>
               <button
-                onClick={exportRegistrationsCSV}
-                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-xs text-white font-bold rounded-lg flex items-center gap-1.5 shadow-md shadow-red-600/20"
+                onClick={() => exportRegistrationsCSV(filteredRegistrations)}
+                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-500 text-xs text-white font-bold rounded-lg flex items-center gap-1.5 shadow-md shadow-red-600/20 transition-colors cursor-pointer"
+                title="Export filtered registrations to CSV"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>Export CSV</span>
+                <span>Export CSV ({filteredRegistrations.length})</span>
               </button>
             </div>
           </div>
 
-          {/* Search & Filter Bar */}
+          {/* Event Status Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-2 p-1.5 bg-[#0C0F17] border border-zinc-800/80 rounded-xl">
+            <button
+              onClick={() => {
+                setRegEventStatusFilter('all');
+                setSelectedRegIds([]);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+                regEventStatusFilter === 'all'
+                  ? 'bg-zinc-800 text-white shadow-sm border border-zinc-700'
+                  : 'text-zinc-400 hover:text-white hover:bg-zinc-900/60'
+              }`}
+            >
+              <span>All Events</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-black/50 text-zinc-300 font-mono">
+                {allRegistrationsCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setRegEventStatusFilter('active');
+                setSelectedRegIds([]);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+                regEventStatusFilter === 'active'
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/80 shadow-sm'
+                  : 'text-zinc-400 hover:text-emerald-400 hover:bg-zinc-900/60'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Active Events</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-black/50 text-emerald-400 font-mono">
+                {activeRegistrationsCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setRegEventStatusFilter('closed');
+                setSelectedRegIds([]);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+                regEventStatusFilter === 'closed'
+                  ? 'bg-amber-950/80 text-amber-300 border border-amber-700/80 shadow-sm'
+                  : 'text-zinc-400 hover:text-amber-400 hover:bg-zinc-900/60'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+              <span>Closed &amp; Past Events</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-black/50 text-amber-400 font-mono">
+                {closedRegistrationsCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setRegEventStatusFilter('archived');
+                setSelectedRegIds([]);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+                regEventStatusFilter === 'archived'
+                  ? 'bg-purple-950/80 text-purple-300 border border-purple-700/80 shadow-sm'
+                  : 'text-zinc-400 hover:text-purple-400 hover:bg-zinc-900/60'
+              }`}
+            >
+              <Archive className="w-3.5 h-3.5" />
+              <span>Archived Records</span>
+              <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-black/50 text-purple-400 font-mono">
+                {archivedRegistrationsCount}
+              </span>
+            </button>
+          </div>
+
+          {/* Search & Program Filter Bar */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
             <div className="sm:col-span-8 relative">
               <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
               <input
                 type="text"
-                placeholder="Search candidate name, email, institution, or team name..."
+                placeholder="Search candidate name, email, phone, college, team, or certificate ID..."
                 value={regSearchTerm}
                 onChange={(e) => setRegSearchTerm(e.target.value)}
-                className="w-full bg-[#0C0F17] border border-zinc-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500"
+                className="w-full bg-[#0C0F17] border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500"
               />
+              {regSearchTerm && (
+                <button
+                  onClick={() => setRegSearchTerm('')}
+                  className="absolute right-3 top-2.5 text-zinc-500 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             <div className="sm:col-span-4">
               <select
                 value={regTargetFilter}
                 onChange={(e) => setRegTargetFilter(e.target.value)}
-                className="w-full bg-[#0C0F17] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500"
+                className="w-full bg-[#0C0F17] border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
               >
-                <option value="All">All Events & Workshops</option>
-                <option value="events">All Competitions (Events)</option>
-                <option value="workshops">All Workshops</option>
-                <optgroup label="Specific Competitions">
-                  {events.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.title}
-                    </option>
-                  ))}
+                <option value="All">All Programs ({events.length + workshops.length})</option>
+                <option value="events">All Competitions ({events.length})</option>
+                <option value="workshops">All Workshops ({workshops.length})</option>
+                <optgroup label="Competitions (Events)">
+                  {events.map((e) => {
+                    const closed = isTargetClosed(e.id, 'event');
+                    return (
+                      <option key={e.id} value={e.id}>
+                        {closed ? '🔴 [Closed]' : '🟢 [Active]'} {e.title}
+                      </option>
+                    );
+                  })}
                 </optgroup>
-                <optgroup label="Specific Workshops">
-                  {workshops.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.title}
-                    </option>
-                  ))}
+                <optgroup label="Workshops">
+                  {workshops.map((w) => {
+                    const closed = isTargetClosed(w.id, 'workshop');
+                    return (
+                      <option key={w.id} value={w.id}>
+                        {closed ? '🔴 [Concluded]' : '🟢 [Active]'} {w.title}
+                      </option>
+                    );
+                  })}
                 </optgroup>
               </select>
             </div>
           </div>
 
-          {/* Table */}
+          {/* Multi-Selection Sticky / Context Action Bar */}
+          {selectedRegIds.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-red-950/40 border border-red-800/80 rounded-xl shadow-lg">
+              <div className="flex items-center gap-2.5 text-xs text-red-200">
+                <CheckSquare className="w-4 h-4 text-red-400 shrink-0" />
+                <span className="font-bold">
+                  {selectedRegIds.length} participant{selectedRegIds.length > 1 ? 's' : ''} selected
+                </span>
+                <span className="text-[11px] text-zinc-400 hidden sm:inline">
+                  (Actions will check for attendance &amp; certificate safety)
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleExecuteArchiveParticipants}
+                  className="px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-purple-700/60 text-purple-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Soft-delete participants safely so records can be restored"
+                >
+                  <Archive className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Archive Selected</span>
+                </button>
+                <button
+                  onClick={handleOpenBulkRemoval}
+                  className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-md shadow-red-600/20 transition-colors cursor-pointer"
+                  title="Remove selected participants with audit protection"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Remove / Delete</span>
+                </button>
+                <button
+                  onClick={() => setSelectedRegIds([])}
+                  className="px-2.5 py-1.5 text-zinc-400 hover:text-white text-xs font-medium cursor-pointer"
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Table / List Container */}
           <div className="bg-[#0C0F17] border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
             {filteredRegistrations.length === 0 ? (
-              <div className="p-12 text-center text-zinc-500 text-xs">
-                No registration records found matching the current search query or filter.
+              <div className="p-12 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-500">
+                  <FileSpreadsheet className="w-6 h-6" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-white">
+                    {regEventStatusFilter === 'active'
+                      ? 'No Active Event Registrations'
+                      : regEventStatusFilter === 'closed'
+                      ? 'No Closed Event Registrations'
+                      : regEventStatusFilter === 'archived'
+                      ? 'No Archived Records Found'
+                      : 'No Registration Records Found'}
+                  </h4>
+                  <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
+                    {regEventStatusFilter === 'active'
+                      ? 'No participant registrations match active tournaments. Switch to "Closed & Past Events" to view historical records, or check the target filter.'
+                      : regEventStatusFilter === 'closed'
+                      ? 'No participants found under closed or past events. When events close, registrations are preserved and will appear here.'
+                      : regEventStatusFilter === 'archived'
+                      ? 'Soft-deleted participants are kept here safely for recovery. No records are currently archived.'
+                      : regSearchTerm
+                      ? `No registrations match query "${regSearchTerm}". Try different keywords or clear filters.`
+                      : 'No student registrations recorded yet.'}
+                  </p>
+                </div>
+                <div className="pt-2 flex justify-center gap-2">
+                  {regEventStatusFilter !== 'all' && (
+                    <button
+                      onClick={() => setRegEventStatusFilter('all')}
+                      className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs text-white font-semibold rounded-lg transition-colors cursor-pointer"
+                    >
+                      Show All Events
+                    </button>
+                  )}
+                  {regSearchTerm && (
+                    <button
+                      onClick={() => setRegSearchTerm('')}
+                      className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-xs text-zinc-300 font-semibold rounded-lg transition-colors cursor-pointer"
+                    >
+                      Clear Search
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div>
                 {/* Mobile Card List View (< 640px) */}
                 <div className="block sm:hidden divide-y divide-zinc-800/80">
-                  {filteredRegistrations.map((reg) => (
-                    <div key={reg.id} className="p-4 space-y-2.5 hover:bg-zinc-900/30 transition-colors">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-bold text-sm text-white">{reg.studentName}</div>
-                          <div className="text-[11px] text-zinc-400 font-mono">{reg.email}</div>
-                        </div>
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase shrink-0 ${
-                            reg.status === 'confirmed'
-                              ? 'bg-emerald-950/80 border border-emerald-800/80 text-emerald-400'
-                              : reg.status === 'pending'
-                              ? 'bg-amber-950/80 border border-amber-800/80 text-amber-400'
-                              : 'bg-zinc-800 text-zinc-400'
-                          }`}
-                        >
-                          {reg.status}
-                        </span>
-                      </div>
-
-                      <div className="text-xs space-y-1 text-zinc-300">
-                        <div>
-                          <span className="text-zinc-500 text-[11px]">Program: </span>
-                          <span className="font-medium text-zinc-200">{reg.targetTitle}</span>
-                        </div>
-                        <div>
-                          <span className="text-zinc-500 text-[11px]">Institution: </span>
-                          <span>{reg.schoolOrCollege}</span>
-                        </div>
-                        {reg.teamName && (
-                          <div>
-                            <span className="text-zinc-500 text-[11px]">Team: </span>
-                            <span className="font-medium text-zinc-200">{reg.teamName} ({reg.teamSize || 2} members)</span>
+                  {filteredRegistrations.map((reg) => {
+                    const isClosed = isTargetClosed(reg.targetId, reg.targetType);
+                    const isSelected = selectedRegIds.includes(reg.id);
+                    return (
+                      <div
+                        key={reg.id}
+                        className={`p-4 space-y-3 transition-colors ${
+                          isSelected ? 'bg-red-950/20' : 'hover:bg-zinc-900/30'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSelectOne(reg.id)}
+                              className="mt-0.5 text-zinc-400 hover:text-white cursor-pointer"
+                              title={isSelected ? 'Deselect participant' : 'Select participant'}
+                            >
+                              {isSelected ? (
+                                <CheckSquare className="w-4 h-4 text-red-500" />
+                              ) : (
+                                <Square className="w-4 h-4 text-zinc-600" />
+                              )}
+                            </button>
+                            <div>
+                              <div className="font-bold text-sm text-white">{reg.studentName}</div>
+                              <div className="text-[11px] text-zinc-400 font-mono">{reg.email}</div>
+                              {reg.phone && <div className="text-[10px] text-zinc-500 font-mono">{reg.phone}</div>}
+                            </div>
                           </div>
-                        )}
-                      </div>
 
-                      <div className="pt-1 flex justify-end">
-                        <button
-                          onClick={() => setSelectedRegDetail(reg)}
-                          className="min-h-[38px] px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-                        >
-                          Inspect Record
-                        </button>
+                          <div className="flex flex-col items-end gap-1">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase shrink-0 ${
+                                reg.status === 'confirmed'
+                                  ? 'bg-emerald-950/80 border border-emerald-800/80 text-emerald-400'
+                                  : reg.status === 'pending'
+                                  ? 'bg-amber-950/80 border border-amber-800/80 text-amber-400'
+                                  : reg.status === 'archived'
+                                  ? 'bg-purple-950/80 border border-purple-800/80 text-purple-300'
+                                  : 'bg-zinc-800 text-zinc-400'
+                              }`}
+                            >
+                              {reg.status}
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase ${
+                                isClosed
+                                  ? 'bg-amber-950/60 text-amber-400 border border-amber-800/60'
+                                  : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'
+                              }`}
+                            >
+                              {isClosed ? 'Closed Event' : 'Active Event'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Program, Attendance & Certificate Info */}
+                        <div className="text-xs space-y-1.5 text-zinc-300 bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-800/60">
+                          <div>
+                            <span className="text-zinc-500 text-[11px]">Program: </span>
+                            <span className="font-semibold text-zinc-200">{reg.targetTitle}</span>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500 text-[11px]">Institution: </span>
+                            <span>{reg.schoolOrCollege}</span>
+                          </div>
+                          {reg.teamName && (
+                            <div>
+                              <span className="text-zinc-500 text-[11px]">Team: </span>
+                              <span className="font-medium text-zinc-200">
+                                {reg.teamName} ({reg.teamSize || 2} members)
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Attendance & Certificate Badges */}
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-zinc-800/60 text-[10px]">
+                            {reg.attendance === 'present' ? (
+                              <span className="px-2 py-0.5 rounded bg-emerald-950/70 border border-emerald-800/60 text-emerald-400 font-medium">
+                                ✓ Attendance: Present
+                              </span>
+                            ) : reg.attendance === 'absent' ? (
+                              <span className="px-2 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-400 font-medium">
+                                ✗ Attendance: Absent
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                                Attendance: Unmarked
+                              </span>
+                            )}
+
+                            {reg.certificateId ? (
+                              <span className="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800/60 text-cyan-300 font-mono font-medium flex items-center gap-1">
+                                <Award className="w-3 h-3 text-cyan-400" />
+                                Cert: {reg.certificateId}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Mobile Actions */}
+                        <div className="pt-1 flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRegDetail(reg)}
+                            className="min-h-[36px] px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-zinc-400" />
+                            <span>Inspect &amp; Edit</span>
+                          </button>
+
+                          <div className="flex items-center gap-1.5">
+                            {reg.status === 'archived' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleRestoreParticipant(reg)}
+                                className="min-h-[36px] px-3 py-1.5 bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-xs font-semibold rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                title="Restore participant to active roster"
+                              >
+                                <ArchiveRestore className="w-3.5 h-3.5" />
+                                <span>Restore</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => archiveRegistration(reg.id, true)}
+                                className="min-h-[36px] px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-lg transition-colors cursor-pointer"
+                                title="Archive participant safely"
+                              >
+                                <Archive className="w-3.5 h-3.5 text-purple-400" />
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenSingleRemoval(reg)}
+                              className="min-h-[36px] px-2.5 py-1.5 bg-red-950/60 hover:bg-red-900 border border-red-800/60 text-red-300 text-xs rounded-lg transition-colors cursor-pointer"
+                              title="Remove participant with safety checks"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Desktop & Tablet Table View (>= 640px) */}
@@ -1728,68 +4382,182 @@ export const AdminDashboard: React.FC = () => {
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-zinc-800 bg-[#080A0E] text-[11px] font-mono text-zinc-400">
-                        <th className="py-3 px-4">STUDENT NAME</th>
-                        <th className="py-3 px-4">PROGRAM</th>
+                        <th className="py-3 px-3 w-10 text-center">
+                          <button
+                            type="button"
+                            onClick={handleToggleSelectAllVisible}
+                            className="cursor-pointer text-zinc-400 hover:text-white"
+                            title="Select all visible participants"
+                          >
+                            {filteredRegistrations.length > 0 &&
+                            filteredRegistrations.every((r) => selectedRegIds.includes(r.id)) ? (
+                              <CheckSquare className="w-4 h-4 text-red-500 mx-auto" />
+                            ) : (
+                              <Square className="w-4 h-4 text-zinc-600 mx-auto" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="py-3 px-4">STUDENT &amp; CONTACT</th>
+                        <th className="py-3 px-4">PROGRAM &amp; EVENT STATUS</th>
                         <th className="py-3 px-4">INSTITUTION</th>
-                        <th className="py-3 px-4">TEAM NAME</th>
+                        <th className="py-3 px-4">ATTENDANCE &amp; CERT</th>
                         <th className="py-3 px-4">STATUS</th>
-                        <th className="py-3 px-4 text-right">ACTION</th>
+                        <th className="py-3 px-4 text-right">ACTIONS</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-800/60 font-sans">
-                      {filteredRegistrations.map((reg) => (
-                        <tr key={reg.id} className="hover:bg-zinc-900/40 transition-colors">
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-white">{reg.studentName}</div>
-                            <div className="text-[11px] text-zinc-400 font-mono">{reg.email}</div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="font-medium text-zinc-200 block truncate max-w-xs">
-                              {reg.targetTitle}
-                            </span>
-                            <span className="text-[10px] font-mono uppercase text-red-400">
-                              {reg.targetType}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-zinc-300">
-                            <div className="truncate max-w-xs">{reg.schoolOrCollege}</div>
-                            <div className="text-[11px] text-zinc-500">{reg.departmentOrClass}</div>
-                          </td>
-                          <td className="py-3 px-4 text-zinc-300">
-                            {reg.teamName ? (
-                              <div>
-                                <span className="font-semibold text-zinc-200">{reg.teamName}</span>
-                                <span className="text-[10px] text-zinc-500 block">
-                                  {reg.teamSize || 2} members
+                      {filteredRegistrations.map((reg) => {
+                        const isClosed = isTargetClosed(reg.targetId, reg.targetType);
+                        const isSelected = selectedRegIds.includes(reg.id);
+                        return (
+                          <tr
+                            key={reg.id}
+                            className={`transition-colors ${
+                              isSelected ? 'bg-red-950/20' : 'hover:bg-zinc-900/40'
+                            }`}
+                          >
+                            <td className="py-3 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSelectOne(reg.id)}
+                                className="cursor-pointer text-zinc-400 hover:text-white"
+                              >
+                                {isSelected ? (
+                                  <CheckSquare className="w-4 h-4 text-red-500 mx-auto" />
+                                ) : (
+                                  <Square className="w-4 h-4 text-zinc-600 mx-auto" />
+                                )}
+                              </button>
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-white flex items-center gap-1.5">
+                                <span>{reg.studentName}</span>
+                                <span className="text-[10px] text-zinc-500 font-mono">({reg.id})</span>
+                              </div>
+                              <div className="text-[11px] text-zinc-400 font-mono">{reg.email}</div>
+                              {reg.phone && (
+                                <div className="text-[10px] text-zinc-500 font-mono">{reg.phone}</div>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <span className="font-semibold text-zinc-200 block truncate max-w-xs">
+                                {reg.targetTitle}
+                              </span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[10px] font-mono uppercase text-red-400 font-bold">
+                                  {reg.targetType}
+                                </span>
+                                <span>·</span>
+                                <span
+                                  className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase ${
+                                    isClosed
+                                      ? 'bg-amber-950/60 text-amber-400 border border-amber-800/60'
+                                      : 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60'
+                                  }`}
+                                >
+                                  {isClosed ? 'Closed Event' : 'Active Event'}
                                 </span>
                               </div>
-                            ) : (
-                              <span className="text-zinc-600 font-mono text-[11px]">Individual</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
-                                reg.status === 'confirmed'
-                                  ? 'bg-emerald-950/80 border border-emerald-800/80 text-emerald-400'
-                                  : reg.status === 'pending'
-                                  ? 'bg-amber-950/80 border border-amber-800/80 text-amber-400'
-                                  : 'bg-zinc-800 text-zinc-400'
-                              }`}
-                            >
-                              {reg.status}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <button
-                              onClick={() => setSelectedRegDetail(reg)}
-                              className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded transition-colors"
-                            >
-                              Inspect
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+
+                            <td className="py-3 px-4 text-zinc-300">
+                              <div className="truncate max-w-xs">{reg.schoolOrCollege}</div>
+                              <div className="text-[11px] text-zinc-500">{reg.departmentOrClass}</div>
+                              {reg.teamName && (
+                                <div className="text-[10px] text-zinc-400 mt-0.5">
+                                  Team: <span className="text-zinc-200">{reg.teamName}</span>
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <div className="space-y-1">
+                                {reg.attendance === 'present' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-emerald-950/80 border border-emerald-800/80 text-emerald-400">
+                                    ✓ Present
+                                  </span>
+                                ) : reg.attendance === 'absent' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-rose-950/80 border border-rose-800/80 text-rose-400">
+                                    ✗ Absent
+                                  </span>
+                                ) : (
+                                  <span className="text-zinc-500 font-mono text-[10px]">Unmarked</span>
+                                )}
+
+                                {reg.certificateId && (
+                                  <div>
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono bg-cyan-950/70 border border-cyan-800/60 text-cyan-300">
+                                      <Award className="w-2.5 h-2.5 text-cyan-400" />
+                                      {reg.certificateId}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-4">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                                  reg.status === 'confirmed'
+                                    ? 'bg-emerald-950/80 border border-emerald-800/80 text-emerald-400'
+                                    : reg.status === 'pending'
+                                    ? 'bg-amber-950/80 border border-amber-800/80 text-amber-400'
+                                    : reg.status === 'archived'
+                                    ? 'bg-purple-950/80 border border-purple-800/80 text-purple-300'
+                                    : 'bg-zinc-800 text-zinc-400'
+                                }`}
+                              >
+                                {reg.status}
+                              </span>
+                            </td>
+
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedRegDetail(reg)}
+                                  className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold rounded transition-colors cursor-pointer"
+                                  title="View full record, attendance and certificates"
+                                >
+                                  Inspect
+                                </button>
+
+                                {reg.status === 'archived' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRestoreParticipant(reg)}
+                                    className="px-2 py-1 bg-purple-900/60 hover:bg-purple-800 text-purple-200 text-xs font-semibold rounded transition-colors cursor-pointer flex items-center gap-1"
+                                    title="Restore participant to active/closed roster"
+                                  >
+                                    <ArchiveRestore className="w-3 h-3" />
+                                    <span>Restore</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => archiveRegistration(reg.id, true)}
+                                    className="p-1 text-zinc-400 hover:text-purple-400 hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                                    title="Archive participant (safe soft-delete)"
+                                  >
+                                    <Archive className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenSingleRemoval(reg)}
+                                  className="p-1 text-zinc-400 hover:text-red-400 hover:bg-red-950/50 rounded transition-colors cursor-pointer"
+                                  title="Remove participant with safety verification"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2637,6 +5405,193 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
+      {/* TAB: BOT DOCUMENTS MANAGEMENT */}
+      {/* ========================================================================= */}
+      {activeTab === 'bot-documents' && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-white">Bot Details &amp; Engineering Blueprints</h2>
+              <p className="text-xs text-zinc-400">
+                Manage PDF technical documents, robot schematics, and competition blueprints in <code>/botDocuments</code>.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenAddBotDoc}
+              className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-md shadow-red-600/20 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Upload PDF Document</span>
+            </button>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="flex flex-col sm:flex-row gap-3 bg-[#0C0F17] border border-zinc-800 p-3 rounded-xl text-xs">
+            <div className="relative flex-1">
+              <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search documents by title, description, or bot/competition..."
+                value={botDocSearchTerm}
+                onChange={(e) => setBotDocSearchTerm(e.target.value)}
+                className="w-full bg-[#07090D] border border-zinc-800 rounded-lg pl-9 pr-3 py-1.5 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-red-500"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-500 text-xs shrink-0">Status:</span>
+              <select
+                value={botDocStatusFilter}
+                onChange={(e) => setBotDocStatusFilter(e.target.value as any)}
+                className="bg-[#07090D] border border-zinc-800 rounded-lg px-2.5 py-1.5 text-zinc-300 focus:outline-none"
+              >
+                <option value="all">All Documents ({botDocuments.length})</option>
+                <option value="published">Published ({botDocuments.filter((d) => d.published).length})</option>
+                <option value="draft">Drafts Only ({botDocuments.filter((d) => !d.published).length})</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Documents Grid / List */}
+          {(() => {
+            const filteredDocs = botDocuments.filter((docItem) => {
+              if (botDocStatusFilter === 'published' && !docItem.published) return false;
+              if (botDocStatusFilter === 'draft' && docItem.published) return false;
+              if (botDocSearchTerm.trim()) {
+                const term = botDocSearchTerm.toLowerCase();
+                const matchesTitle = docItem.title.toLowerCase().includes(term);
+                const matchesDesc = docItem.description.toLowerCase().includes(term);
+                const matchesTag = (docItem.botOrCompetition || '').toLowerCase().includes(term);
+                return matchesTitle || matchesDesc || matchesTag;
+              }
+              return true;
+            });
+
+            if (filteredDocs.length === 0) {
+              return (
+                <div className="p-12 text-center text-zinc-500 bg-[#0C0F17] border border-zinc-800 rounded-xl space-y-2">
+                  <FileText className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-zinc-300">No Bot Documents Found</p>
+                  <p className="text-xs text-zinc-500">
+                    {botDocuments.length === 0
+                      ? 'No technical PDF documents have been uploaded yet. Click "Upload PDF Document" above to attach a robot specification.'
+                      : 'No documents match your current filter criteria.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredDocs.map((docItem) => {
+                  const sizeFormatted =
+                    docItem.fileSize && docItem.fileSize > 0
+                      ? docItem.fileSize > 1024 * 1024
+                        ? `${(docItem.fileSize / (1024 * 1024)).toFixed(2)} MB`
+                        : `${(docItem.fileSize / 1024).toFixed(0)} KB`
+                      : 'PDF Document';
+
+                  return (
+                    <div
+                      key={docItem.id}
+                      className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-5 space-y-4 flex flex-col justify-between hover:border-zinc-700 transition-colors shadow-md"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800 flex items-center gap-1.5">
+                            <FileText className="w-3 h-3 text-red-400" />
+                            <span>{docItem.fileName || 'document.pdf'}</span>
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                                docItem.published
+                                  ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40'
+                                  : 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
+                              }`}
+                            >
+                              {docItem.published ? 'PUBLISHED' : 'DRAFT'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h3 className="text-base font-bold text-white flex items-center gap-2">
+                            <span>{docItem.title}</span>
+                          </h3>
+                          {docItem.botOrCompetition && (
+                            <span className="inline-block mt-1 text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-red-950/50 text-red-300 border border-red-800/40">
+                              {docItem.botOrCompetition}
+                            </span>
+                          )}
+                          <p className="text-xs text-zinc-400 leading-relaxed mt-2 line-clamp-3">
+                            {docItem.description}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-3 pt-2 text-[11px] font-mono text-zinc-500 border-t border-zinc-800/80">
+                          <span>Size: <span className="text-zinc-300">{sizeFormatted}</span></span>
+                          {docItem.uploadedAt && (
+                            <>
+                              <span>&bull;</span>
+                              <span>Date: <span className="text-zinc-300">{docItem.uploadedAt}</span></span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-zinc-800/80 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={docItem.pdfUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-semibold rounded flex items-center gap-1.5 transition-colors"
+                            title="Open PDF document in new window"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-red-400" />
+                            <span>View PDF</span>
+                          </a>
+                          <button
+                            onClick={() => handleToggleBotDocPublished(docItem)}
+                            className="px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs rounded transition-colors cursor-pointer"
+                          >
+                            {docItem.published ? 'Unpublish' : 'Publish'}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleOpenEditBotDoc(docItem)}
+                            className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold rounded flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-zinc-400" />
+                            <span>Edit / Replace</span>
+                          </button>
+                          <button
+                            onClick={() =>
+                              setDeleteTarget({
+                                type: 'bot-document',
+                                id: docItem.id,
+                                title: docItem.title,
+                              })
+                            }
+                            className="p-1.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded transition-colors cursor-pointer"
+                            title="Delete Bot Document"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
       {/* TAB 9: HOST ENQUIRIES */}
       {/* ========================================================================= */}
       {activeTab === 'enquiries' && (
@@ -2730,10 +5685,53 @@ export const AdminDashboard: React.FC = () => {
                 <span className="text-zinc-200 font-bold">altronz.firebasestorage.app</span>
               </div>
               <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-lg">
-                <span className="text-zinc-500 block text-[10px]">ACTIVE ADMIN ROLE</span>
+                <span className="text-zinc-500 block text-[10px]">ACTIVE ADMIN SESSION</span>
                 <span className="text-zinc-200 font-bold truncate block">
-                  {currentUser?.email || 'ssmssai2007@gmail.com'}
+                  {currentUser?.email || 'Authorized Administrator'}
                 </span>
+              </div>
+            </div>
+
+            {/* Approved 5 Admin Accounts Directory */}
+            <div className="p-4 bg-zinc-900/40 border border-zinc-800/80 rounded-xl space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-red-500" />
+                  Authorized Team Administrators (5 Accounts)
+                </span>
+                <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded">
+                  Enforced in Firestore Rules & Auth
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 text-xs font-mono">
+                {[
+                  { email: 'ssmssai2007@gmail.com', label: 'Primary Admin' },
+                  { email: 'praveenananth107@gmail.com', label: 'Operations Admin' },
+                  { email: 'sheikramiz021@gmail.com', label: 'Operations Admin' },
+                  { email: 'anzz63065@gmail.com', label: 'Operations Admin' },
+                  { email: 'nowfalsiraj007@gmail.com', label: 'Operations Admin' },
+                ].map((adm, i) => {
+                  const isCurrent = currentUser?.email?.toLowerCase() === adm.email.toLowerCase();
+                  return (
+                    <div
+                      key={adm.email}
+                      className={`p-2.5 rounded-lg border text-left transition-colors ${
+                        isCurrent
+                          ? 'bg-red-950/40 border-red-800/80 text-white'
+                          : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-0.5">
+                        <span>Admin #{i + 1}</span>
+                        {isCurrent && <span className="text-emerald-400 font-bold text-[9px] uppercase">Active</span>}
+                      </div>
+                      <div className="text-[11px] font-semibold truncate text-white" title={adm.email}>
+                        {adm.email}
+                      </div>
+                      <div className="text-[10px] text-zinc-500 mt-0.5">{adm.label}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -3776,6 +6774,23 @@ export const AdminDashboard: React.FC = () => {
                     className="w-full bg-[#07090D] border border-zinc-800 rounded-lg p-2.5 text-white"
                   />
                 </div>
+
+                <div className="col-span-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-zinc-300 font-medium">WhatsApp Group Invite Link (Optional)</label>
+                    <span className="text-[10px] text-zinc-500 font-mono">e.g. https://chat.whatsapp.com/...</span>
+                  </div>
+                  <input
+                    type="url"
+                    placeholder="https://chat.whatsapp.com/ExampleGroupId"
+                    value={eventFormData.whatsappInviteUrl}
+                    onChange={(e) => setEventFormData({ ...eventFormData, whatsappInviteUrl: e.target.value })}
+                    className="w-full bg-[#07090D] border border-zinc-800 rounded-lg p-2.5 text-white font-mono text-xs placeholder:text-zinc-600 focus:outline-none focus:border-red-500"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1">
+                    Verified registrants will receive a &quot;Join WhatsApp Group&quot; link button upon successful registration to join the event chat.
+                  </p>
+                </div>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
@@ -3940,44 +6955,420 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* MODAL: REGISTRATION DETAILS INSPECTION */}
+      {/* MODAL: BOT BLUEPRINT DOCUMENT ADD / EDIT */}
       {/* ========================================================================= */}
-      {selectedRegDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
-          <div className="relative w-full max-w-lg bg-[#0F1219] border border-zinc-800 rounded-2xl p-5 sm:p-6 space-y-5 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
-            <div className="flex justify-between items-start border-b border-zinc-800 pb-3">
-              <div>
-                <span className="text-xs font-mono font-bold text-red-400">{selectedRegDetail.id}</span>
-                <h3 className="text-lg font-bold text-white mt-0.5">{selectedRegDetail.studentName}</h3>
+      {isBotDocModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-xl bg-[#0F1219] border border-zinc-800 rounded-2xl p-6 space-y-4 shadow-2xl my-8">
+            <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-red-500" />
+                <h3 className="text-base font-bold text-white">
+                  {editingBotDoc ? 'Edit Bot Blueprint Document' : 'Upload Bot Blueprint (PDF Only)'}
+                </h3>
               </div>
-              <button onClick={() => setSelectedRegDetail(null)} className="text-zinc-400 hover:text-white">
+              <button
+                onClick={() => !isSubmitting && setIsBotDocModalOpen(false)}
+                disabled={isSubmitting}
+                className="text-zinc-400 hover:text-white cursor-pointer disabled:opacity-40"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            <form onSubmit={handleSaveBotDoc} className="space-y-4 text-xs">
+              {/* PDF File Picker Zone */}
+              <div className="space-y-2">
+                <label className="block text-zinc-300 font-medium">
+                  Technical PDF Document <span className="text-red-400">*</span>
+                  <span className="text-zinc-500 font-mono ml-2 font-normal">(Max 15 MB · PDF format only)</span>
+                </label>
+
+                {editingBotDoc && !selectedPdfFile && (
+                  <div className="p-3 bg-zinc-900/80 border border-zinc-800 rounded-lg flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 truncate">
+                      <FileText className="w-4 h-4 text-red-400 shrink-0" />
+                      <span className="text-white font-mono truncate">{botDocFormData.fileName || 'Attached Document'}</span>
+                      {botDocFormData.fileSize > 0 && (
+                        <span className="text-zinc-500 font-mono text-[11px] shrink-0">
+                          ({(botDocFormData.fileSize / (1024 * 1024)).toFixed(2)} MB)
+                        </span>
+                      )}
+                    </div>
+                    <a
+                      href={botDocFormData.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-red-400 hover:text-red-300 underline font-mono text-[11px] shrink-0"
+                    >
+                      Preview
+                    </a>
+                  </div>
+                )}
+
+                <div className="border border-dashed border-zinc-700 hover:border-zinc-500 rounded-xl p-4 text-center bg-[#07090D] transition-colors">
+                  <input
+                    type="file"
+                    id="botPdfInput"
+                    accept=".pdf,application/pdf"
+                    onChange={handlePdfFileSelect}
+                    disabled={isSubmitting}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="botPdfInput"
+                    className="cursor-pointer flex flex-col items-center justify-center space-y-1.5"
+                  >
+                    <Upload className="w-6 h-6 text-zinc-400 hover:text-red-400 transition-colors" />
+                    <span className="text-zinc-300 font-medium">
+                      {selectedPdfFile
+                        ? `Selected: ${selectedPdfFile.name} (${(selectedPdfFile.size / (1024 * 1024)).toFixed(2)} MB)`
+                        : editingBotDoc
+                        ? 'Click to choose replacement PDF file'
+                        : 'Click to select PDF document'}
+                    </span>
+                    <span className="text-[10px] text-zinc-500 font-mono">
+                      Strictly PDF files (.pdf) up to 15MB
+                    </span>
+                  </label>
+                </div>
+
+                {pdfValidationError && (
+                  <div className="p-2.5 bg-red-950/60 border border-red-800/60 rounded-lg text-red-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                    <span>{pdfValidationError}</span>
+                  </div>
+                )}
+
+                {pdfUploadProgress > 0 && isSubmitting && (
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-[11px] font-mono text-zinc-400">
+                      <span>Uploading to CDN...</span>
+                      <span>{pdfUploadProgress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-red-600 transition-all duration-300 rounded-full"
+                        style={{ width: `${pdfUploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Title Input */}
+              <div>
+                <label className="block text-zinc-300 font-medium mb-1">
+                  Document Title <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Titan v3 Combat Robot - CAD Blueprints & Wiring Schematic"
+                  value={botDocFormData.title}
+                  onChange={(e) => setBotDocFormData({ ...botDocFormData, title: e.target.value })}
+                  className="w-full bg-[#07090D] border border-zinc-800 rounded-lg p-2.5 text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              {/* Description Input */}
+              <div>
+                <label className="block text-zinc-300 font-medium mb-1">
+                  Document Description &amp; Technical Scope <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Summarize the robot specifications, power telemetry, motor ratings, and bill of materials included in this document."
+                  value={botDocFormData.description}
+                  onChange={(e) => setBotDocFormData({ ...botDocFormData, description: e.target.value })}
+                  className="w-full bg-[#07090D] border border-zinc-800 rounded-lg p-2.5 text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              {/* Grid: Bot/Competition Tag & Status */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-300 font-medium mb-1">
+                    Bot or Competition Tag (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Robo Sumo 3.0kg, Robo Soccer"
+                    value={botDocFormData.botOrCompetition}
+                    onChange={(e) => setBotDocFormData({ ...botDocFormData, botOrCompetition: e.target.value })}
+                    className="w-full bg-[#07090D] border border-zinc-800 rounded-lg p-2.5 text-white placeholder:text-zinc-600 focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-zinc-300 font-medium mb-1">Publication Status</label>
+                  <select
+                    value={botDocFormData.published ? 'published' : 'draft'}
+                    onChange={(e) =>
+                      setBotDocFormData({
+                        ...botDocFormData,
+                        published: e.target.value === 'published',
+                      })
+                    }
+                    className="w-full bg-[#07090D] border border-zinc-800 rounded-lg p-2.5 text-white focus:outline-none focus:border-red-500"
+                  >
+                    <option value="published">Published (Visible to Public)</option>
+                    <option value="draft">Draft (Admin Only)</option>
+                  </select>
+                </div>
+              </div>
+
+              <p className="text-[10px] text-zinc-500 font-mono">
+                Note: Draft documents remain strictly admin-only. Only documents with Published status will appear on the public Bot Details page.
+              </p>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setIsBotDocModalOpen(false)}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 text-zinc-400 hover:text-white cursor-pointer disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-md shadow-red-600/20 cursor-pointer"
+                >
+                  {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{editingBotDoc ? 'Save Document Changes' : 'Upload & Save Document'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: REGISTRATION DETAILS INSPECTION */}
+      {/* ========================================================================= */}
+      {/* ========================================================================= */}
+      {/* MODAL: SAFE REMOVAL & ARCHIVE CONFIRMATION WITH ATTENDANCE/CERT AUDIT */}
+      {/* ========================================================================= */}
+      {removalModalState.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-[#0F1219] border border-red-900/60 rounded-2xl p-6 space-y-5 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-500/30 flex items-center justify-center text-red-500 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-white">
+                  {removalModalState.mode === 'bulk'
+                    ? `Remove ${removalModalState.targetRegistrations.length} Participants`
+                    : `Remove Participant Registration`}
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  Target Event(s):{' '}
+                  <span className="text-white font-semibold">
+                    {Array.from(new Set(removalModalState.targetRegistrations.map((r) => r.targetTitle))).join(', ')}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {/* Selected Participants Summary */}
+            <div className="p-3 bg-zinc-900/70 border border-zinc-800 rounded-xl space-y-2">
+              <div className="flex items-center justify-between text-xs font-mono text-zinc-400">
+                <span>Selected Candidates:</span>
+                <span className="text-white font-bold">{removalModalState.targetRegistrations.length} Total</span>
+              </div>
+              <div className="max-h-28 overflow-y-auto space-y-1 text-xs font-mono">
+                {removalModalState.targetRegistrations.map((r) => (
+                  <div key={r.id} className="flex items-center justify-between py-0.5 text-zinc-300">
+                    <span className="truncate max-w-[200px] sm:max-w-xs">{r.studentName} ({r.email})</span>
+                    <span className="text-[10px] text-zinc-500 shrink-0">{r.id}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Attendance & Certificate Audit Guard */}
+            {(() => {
+              const affectedRecords = removalModalState.targetRegistrations.filter(
+                (r) => r.attendanceRecorded || r.attended || r.certificateIssued || r.certificateId
+              );
+
+              if (affectedRecords.length > 0) {
+                return (
+                  <div className="p-4 bg-amber-950/40 border border-amber-600/70 rounded-xl space-y-2.5">
+                    <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>Attendance &amp; Certificate Protection Alert!</span>
+                    </div>
+                    <p className="text-[11px] text-amber-200/90 leading-relaxed">
+                      The following participant(s) have verified attendance or completion certificates recorded:
+                    </p>
+                    <div className="max-h-28 overflow-y-auto space-y-1 text-[11px] font-mono bg-black/40 p-2 rounded-lg border border-amber-800/50">
+                      {affectedRecords.map((r) => (
+                        <div key={r.id} className="text-amber-300 flex items-center justify-between">
+                          <span className="font-semibold truncate">{r.studentName}</span>
+                          <span className="text-[10px] text-amber-400 shrink-0 ml-2">
+                            {r.attendance ? `[Att: ${r.attendance.toUpperCase()}]` : '[Att: Present]'}
+                            {r.certificateId ? ` [Cert: ${r.certificateId}]` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      Permanent deletion will destroy verified audit records. We recommend archiving to preserve certification validity while clearing the active roster.
+                    </p>
+
+                    <div className="pt-1 flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id="confirmDeleteWithRecords"
+                        checked={removalModalState.confirmPermanentDelete}
+                        onChange={(e) =>
+                          setRemovalModalState((prev) => ({
+                            ...prev,
+                            confirmPermanentDelete: e.target.checked,
+                          }))
+                        }
+                        className="mt-0.5 rounded border-zinc-700 text-red-600 focus:ring-red-500 bg-zinc-900 cursor-pointer"
+                      />
+                      <label htmlFor="confirmDeleteWithRecords" className="text-[11px] text-zinc-300 cursor-pointer">
+                        I acknowledge that verified attendance or certificate records exist and confirm deliberate deletion.
+                      </label>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg text-[11px] text-zinc-400">
+                  <span className="font-semibold text-zinc-300">Safe Audit Check:</span> No recorded attendance or verified certificates were found for these participants.
+                </div>
+              );
+            })()}
+
+            {/* Permanent Warning */}
+            <p className="text-[11px] text-zinc-500 font-mono">
+              Archiving soft-deletes records so they can be restored. Permanent deletion deletes the document from Cloud Firestore and is irreversible.
+            </p>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-2 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() =>
+                  setRemovalModalState({
+                    isOpen: false,
+                    targetRegistrations: [],
+                    mode: 'single',
+                    isProcessing: false,
+                    confirmPermanentDelete: false,
+                  })
+                }
+                disabled={removalModalState.isProcessing}
+                className="px-4 py-2 text-xs font-semibold text-zinc-400 hover:text-white transition-colors cursor-pointer text-center"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecuteArchiveParticipants}
+                disabled={removalModalState.isProcessing}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-purple-300 text-xs font-semibold rounded-lg border border-purple-700/60 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Archive (soft delete) safely with full recovery"
+              >
+                <Archive className="w-3.5 h-3.5 text-purple-400" />
+                <span>Archive (Safe &amp; Recoverable)</span>
+              </button>
+
+              {(() => {
+                const hasProtected = removalModalState.targetRegistrations.some(
+                  (r) => r.attendanceRecorded || r.attended || r.certificateIssued || r.certificateId
+                );
+                const canDelete = !hasProtected || removalModalState.confirmPermanentDelete;
+                return (
+                  <button
+                    type="button"
+                    onClick={handleExecutePermanentDeleteParticipants}
+                    disabled={!canDelete || removalModalState.isProcessing}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-red-600/20 cursor-pointer"
+                  >
+                    {removalModalState.isProcessing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>Delete Permanently</span>
+                  </button>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ENHANCED REGISTRATION DETAILS & VERIFICATION INSPECTION */}
+      {/* ========================================================================= */}
+      {selectedRegDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-[#0F1219] border border-zinc-800 rounded-2xl p-5 sm:p-6 space-y-4 shadow-2xl my-auto max-h-[92vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-zinc-800 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-red-400">{selectedRegDetail.id}</span>
+                  <span
+                    className={`px-1.5 py-0.2 rounded text-[9px] font-mono uppercase font-bold ${
+                      isTargetClosed(selectedRegDetail.targetId, selectedRegDetail.targetType)
+                        ? 'bg-amber-950/70 text-amber-400 border border-amber-800/70'
+                        : 'bg-emerald-950/70 text-emerald-400 border border-emerald-800/70'
+                    }`}
+                  >
+                    {isTargetClosed(selectedRegDetail.targetId, selectedRegDetail.targetType)
+                      ? 'Closed Event'
+                      : 'Active Event'}
+                  </span>
+                  {selectedRegDetail.status === 'archived' && (
+                    <span className="px-1.5 py-0.2 rounded text-[9px] font-mono uppercase bg-purple-950 text-purple-300 border border-purple-800">
+                      Archived
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-lg font-bold text-white mt-1">{selectedRegDetail.studentName}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedRegDetail(null)}
+                className="text-zinc-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Student & Event Info */}
             <div className="space-y-2 text-xs divide-y divide-zinc-800/80">
-              <div className="flex justify-between py-1.5">
+              <div className="flex justify-between py-1">
                 <span className="text-zinc-500">Email Address:</span>
                 <span className="text-zinc-200 font-mono">{selectedRegDetail.email}</span>
               </div>
-              <div className="flex justify-between py-1.5">
+              <div className="flex justify-between py-1">
                 <span className="text-zinc-500">Phone Contact:</span>
                 <span className="text-zinc-200 font-mono">{selectedRegDetail.phone}</span>
               </div>
-              <div className="flex justify-between py-1.5">
+              <div className="flex justify-between py-1">
                 <span className="text-zinc-500">Institution:</span>
                 <span className="text-zinc-200 text-right">{selectedRegDetail.schoolOrCollege}</span>
               </div>
-              <div className="flex justify-between py-1.5">
+              <div className="flex justify-between py-1">
                 <span className="text-zinc-500">Department / Class:</span>
                 <span className="text-zinc-200 text-right">{selectedRegDetail.departmentOrClass}</span>
               </div>
-              <div className="flex justify-between py-1.5">
+              <div className="flex justify-between py-1">
                 <span className="text-zinc-500">Selected Program:</span>
                 <span className="text-zinc-200 text-right font-medium">{selectedRegDetail.targetTitle}</span>
               </div>
               {selectedRegDetail.teamName && (
-                <div className="flex justify-between py-1.5">
+                <div className="flex justify-between py-1">
                   <span className="text-zinc-500">Team Name:</span>
                   <span className="text-zinc-200">
                     {selectedRegDetail.teamName} ({selectedRegDetail.teamSize} members)
@@ -3985,24 +7376,198 @@ export const AdminDashboard: React.FC = () => {
                 </div>
               )}
               {selectedRegDetail.teammateDetails && (
-                <div className="py-1.5">
+                <div className="py-1">
                   <span className="text-zinc-500 block">Teammates:</span>
                   <span className="text-zinc-300 block mt-0.5">{selectedRegDetail.teammateDetails}</span>
                 </div>
               )}
-              <div className="flex justify-between py-1.5">
-                <span className="text-zinc-500">Experience:</span>
+              <div className="flex justify-between py-1">
+                <span className="text-zinc-500">Experience Level:</span>
                 <span className="text-zinc-200">{selectedRegDetail.experienceLevel}</span>
               </div>
-              <div className="flex justify-between py-1.5">
-                <span className="text-zinc-500">Submission Date:</span>
+              <div className="flex justify-between py-1">
+                <span className="text-zinc-500">Registration Date:</span>
                 <span className="text-zinc-200 font-mono">{selectedRegDetail.timestamp}</span>
+              </div>
+              {selectedRegDetail.archivedAt && (
+                <div className="flex justify-between py-1 text-purple-400">
+                  <span>Archived Timestamp:</span>
+                  <span className="font-mono">{selectedRegDetail.archivedAt}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Attendance Management Section */}
+            <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  Event Attendance
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold ${
+                    selectedRegDetail.attendance === 'present'
+                      ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                      : selectedRegDetail.attendance === 'absent'
+                      ? 'bg-rose-950 text-rose-400 border border-rose-800'
+                      : 'bg-zinc-800 text-zinc-400'
+                  }`}
+                >
+                  {selectedRegDetail.attendance || 'Unmarked'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await updateRegistrationAttendance(selectedRegDetail.id, 'present');
+                      setSelectedRegDetail((prev) =>
+                        prev ? { ...prev, attendance: 'present', attended: true, attendanceRecorded: true } : null
+                      );
+                      showToast('success', `Marked ${selectedRegDetail.studentName} as PRESENT.`);
+                    } catch (err: any) {
+                      showToast('error', `Failed: ${err.message}`);
+                    }
+                  }}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    selectedRegDetail.attendance === 'present'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                  }`}
+                >
+                  Mark Present
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await updateRegistrationAttendance(selectedRegDetail.id, 'absent');
+                      setSelectedRegDetail((prev) =>
+                        prev ? { ...prev, attendance: 'absent', attended: false, attendanceRecorded: true } : null
+                      );
+                      showToast('info', `Marked ${selectedRegDetail.studentName} as ABSENT.`);
+                    } catch (err: any) {
+                      showToast('error', `Failed: ${err.message}`);
+                    }
+                  }}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    selectedRegDetail.attendance === 'absent'
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'
+                  }`}
+                >
+                  Mark Absent
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await updateRegistrationAttendance(selectedRegDetail.id, 'unmarked');
+                      setSelectedRegDetail((prev) =>
+                        prev ? { ...prev, attendance: undefined, attended: false, attendanceRecorded: false } : null
+                      );
+                      showToast('info', 'Cleared attendance record.');
+                    } catch (err: any) {
+                      showToast('error', `Failed: ${err.message}`);
+                    }
+                  }}
+                  className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-xs rounded-lg cursor-pointer"
+                  title="Clear attendance"
+                >
+                  Clear
+                </button>
               </div>
             </div>
 
-            <div className="flex justify-between items-center pt-3 border-t border-zinc-800">
+            {/* Certificate Verification Section */}
+            <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-cyan-400" />
+                  Official Certificate Verification
+                </span>
+                {selectedRegDetail.certificateId ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    Verified
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-zinc-500 font-mono">Not Issued</span>
+                )}
+              </div>
+
+              {selectedRegDetail.certificateId ? (
+                <div className="flex items-center justify-between p-2 bg-black/40 border border-cyan-900/50 rounded-lg">
+                  <span className="font-mono text-cyan-300 font-bold">{selectedRegDetail.certificateId}</span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await updateRegistrationCertificate(selectedRegDetail.id, null);
+                        setSelectedRegDetail((prev) =>
+                          prev ? { ...prev, certificateIssued: false, certificateId: undefined } : null
+                        );
+                        showToast('info', 'Certificate revoked.');
+                      } catch (err: any) {
+                        showToast('error', `Failed: ${err.message}`);
+                      }
+                    }}
+                    className="text-[11px] text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      placeholder="e.g. CERT-ALT-2026-8812"
+                      value={certInputVal}
+                      onChange={(e) => setCertInputVal(e.target.value)}
+                      className="flex-1 bg-[#07090D] border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-red-500 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCertInputVal(`CERT-ALT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`)
+                      }
+                      className="px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] rounded-lg cursor-pointer shrink-0"
+                    >
+                      Generate ID
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const idToSave = certInputVal.trim();
+                      if (!idToSave) {
+                        showToast('error', 'Please enter or generate a Certificate ID first.');
+                        return;
+                      }
+                      try {
+                        await updateRegistrationCertificate(selectedRegDetail.id, idToSave);
+                        setSelectedRegDetail((prev) =>
+                          prev ? { ...prev, certificateIssued: true, certificateId: idToSave } : null
+                        );
+                        setCertInputVal('');
+                        showToast('success', `Assigned Certificate ${idToSave}`);
+                      } catch (err: any) {
+                        showToast('error', `Failed: ${err.message}`);
+                      }
+                    }}
+                    className="w-full py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-lg transition-colors cursor-pointer"
+                  >
+                    Assign &amp; Verify Certificate
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Status Update & Actions Footer */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-800">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-400">Update Status:</span>
+                <span className="text-xs text-zinc-400">Roster Status:</span>
                 <select
                   value={selectedRegDetail.status}
                   onChange={async (e) => {
@@ -4015,20 +7580,63 @@ export const AdminDashboard: React.FC = () => {
                       showToast('error', `Status update failed: ${err.message}`);
                     }
                   }}
-                  className="bg-zinc-900 border border-zinc-700 text-xs text-white rounded-lg px-2.5 py-1.5"
+                  className="bg-zinc-900 border border-zinc-700 text-xs text-white rounded-lg px-2.5 py-1.5 cursor-pointer"
                 >
                   <option value="confirmed">Confirmed</option>
                   <option value="pending">Pending</option>
                   <option value="waitlist">Waitlist</option>
+                  <option value="archived">Archived</option>
                 </select>
               </div>
 
-              <button
-                onClick={() => setSelectedRegDetail(null)}
-                className="px-4 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold rounded-lg"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedRegDetail.status === 'archived' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleRestoreParticipant(selectedRegDetail)}
+                    className="px-3 py-1.5 bg-purple-900/70 hover:bg-purple-800 text-purple-200 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
+                  >
+                    <ArchiveRestore className="w-3.5 h-3.5" />
+                    <span>Restore</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await archiveRegistration(selectedRegDetail.id, true);
+                        setSelectedRegDetail((prev) => (prev ? { ...prev, status: 'archived' } : null));
+                        showToast('success', `Archived ${selectedRegDetail.studentName}.`);
+                      } catch (err: any) {
+                        showToast('error', `Archive failed: ${err.message}`);
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
+                    title="Soft-delete safely"
+                  >
+                    <Archive className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Archive</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenSingleRemoval(selectedRegDetail)}
+                  className="px-3 py-1.5 bg-red-950/70 hover:bg-red-900 border border-red-800/80 text-red-300 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer"
+                  title="Remove participant with safety checks"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Remove</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedRegDetail(null)}
+                  className="px-3.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold rounded-lg cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
