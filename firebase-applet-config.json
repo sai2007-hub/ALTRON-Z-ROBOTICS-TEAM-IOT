@@ -1,12 +1,13 @@
+
 {
   "projectId": "altronzz",
-  "appId": "1:443286454963:web:9739f6eba8d2da7de1e6c6",
-  "apiKey": "AIzaSyBaUOJ_5FDDWj3nUJ1_VIq06tN23XTaLTM",
+  "appId": "1:121554991144:web:e76a23471a364c256e9d1d",
+  "apiKey": "AIzaSyCKDVBCzZUOdefVJS_521uSFVNspi6k_p4",
   "authDomain": "altronzz.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-altronsroboticse-63f69328-ba63-4ae7-996f-76417b3cc48e",
-  "storageBucket": "altronz.firebasestorage.app",
-  "messagingSenderId": "443286454963",
-  "measurementId": "",
+  "firestoreDatabaseId": "ai-studio-altronroboticse-63f69328-ba63-4ae7-996f-76417b3cc48e",
+  "storageBucket": "altronzz.firebasestorage.app",
+  "messagingSenderId": "121554991144",
+  "measurementId": "G-7ERF9JNFKP",
   "oAuthClientId": "443286454963-3g4b8h0nnvgotv0fkbt923j78g01e2m1.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }
