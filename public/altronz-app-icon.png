@@ -1,0 +1,16 @@
+from PIL import Image
+from pathlib import Path
+
+src = Image.open("/mnt/data/1000089092.jpg").convert("RGB")
+# Crop the distinctive triangular ALTRON'Z emblem, excluding the small wordmark below.
+crop = src.crop((250, 145, 1005, 710))
+# Fit on a square black canvas with comfortable padding for Android's icon mask.
+side = 1024
+icon = Image.new("RGB", (side, side), (0, 0, 0))
+crop.thumbnail((850, 850), Image.Resampling.LANCZOS)
+x = (side - crop.width) // 2
+y = (side - crop.height) // 2
+icon.paste(crop, (x, y))
+out = "/mnt/data/altronz-app-icon.png"
+icon.save(out, format="PNG", optimize=True)
+print(out)
