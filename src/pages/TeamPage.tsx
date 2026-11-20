@@ -1,11 +1,14 @@
+
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { TeamMember } from '../types';
-import { Mail, Linkedin, Github, Cpu, ShieldCheck, User as UserIcon } from 'lucide-react';
+import {
+  Mail, Linkedin, Github, Cpu, ShieldCheck, Users,
+  Sparkles, ArrowUpRight, User as UserIcon
+} from 'lucide-react';
 
 export const TeamPage: React.FC = () => {
   const { teamMembers, isAdmin } = useApp();
-  const [selectedSubsystem, setSelectedSubsystem] = useState<string>('All');
+  const [selectedSubsystem, setSelectedSubsystem] = useState('All');
   const [failedAvatars, setFailedAvatars] = useState<Record<string, boolean>>({});
 
   const subsystems = [
@@ -17,167 +20,288 @@ export const TeamPage: React.FC = () => {
     'Operations & Outreach',
   ];
 
-  // Public visitors see published members; Admins see all
   const visibleTeam = isAdmin
     ? teamMembers
-    : teamMembers.filter((m) => m.published !== false);
+    : teamMembers.filter(member => member.published !== false);
 
-  const filteredTeam =
-    selectedSubsystem === 'All'
-      ? visibleTeam
-      : visibleTeam.filter((m) => m.subsystem === selectedSubsystem);
+  const filteredTeam = selectedSubsystem === 'All'
+    ? visibleTeam
+    : visibleTeam.filter(member => member.subsystem === selectedSubsystem);
+
+  const glass =
+    'rounded-3xl border border-white/10 bg-white/[.055] backdrop-blur-xl shadow-[0_18px_60px_rgba(2,6,23,.25)]';
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-zinc-800">
-        <div>
-          <div className="text-xs font-mono text-red-500 uppercase tracking-widest mb-1">
-            Engineers & Innovators
+    <main className="relative isolate min-h-screen overflow-hidden bg-[#07101f] pb-20 text-white">
+      {/* Ambient background */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -left-40 -top-20 h-96 w-96 rounded-full bg-blue-500/20 blur-[120px]" />
+        <div className="absolute -right-40 top-40 h-[30rem] w-[30rem] rounded-full bg-violet-500/20 blur-[130px]" />
+        <div className="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-cyan-500/10 blur-[120px]" />
+        <div
+          className="absolute inset-0 opacity-[.09]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(148,163,184,.2) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.2) 1px, transparent 1px)',
+            backgroundSize: '48px 48px'
+          }}
+        />
+      </div>
+
+      {/* Team introduction */}
+      <section className="mx-auto max-w-7xl px-4 pb-10 pt-14 sm:px-6 sm:pt-20 lg:px-8">
+        <div className="grid items-end gap-7 lg:grid-cols-[.65fr_1.5fr_1fr]">
+          <div className="text-[10px] font-bold uppercase tracking-[.25em] text-cyan-200">
+            [ OUR TEAM ]
+            <div className="mt-3 h-px w-12 bg-cyan-300/60" />
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Meet the ALTRON&apos;Z ROBOTICS TEAM &amp; IOT Crew
-          </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-2 max-w-xl">
-            A multidisciplinary engineering crew uniting mechanical designers, embedded systems architects, control theorists, and STEM mentors.
+
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[.2em] text-violet-200/80">
+              ALTRON'Z / People behind the machines
+            </p>
+            <h1 className="text-4xl font-black tracking-tight sm:text-5xl lg:text-6xl">
+              Meet the
+              <span className="block bg-gradient-to-r from-cyan-200 via-blue-300 to-violet-300 bg-clip-text text-transparent">
+                Innovators.
+              </span>
+            </h1>
+          </div>
+
+          <p className="max-w-sm text-sm leading-7 text-slate-300/70 lg:justify-self-end">
+            The people who turn ambitious ideas into engineered systems.
+            Meet the students, builders and mentors behind ALTRON'Z Robotics Team & IoT.
           </p>
         </div>
 
-        {/* Filter */}
-        <div className="flex items-center gap-1 p-1 bg-[#12151F] border border-zinc-800 rounded-lg overflow-x-auto">
-          {subsystems.map((sub) => (
+        {/* Team metrics */}
+        <div className={`${glass} mt-10 grid grid-cols-2 gap-4 p-5 sm:grid-cols-3 sm:p-6`}>
+          <div>
+            <Users className="h-5 w-5 text-cyan-200" />
+            <p className="mt-3 text-2xl font-black">{visibleTeam.length}</p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-400">Team members</p>
+          </div>
+          <div>
+            <Cpu className="h-5 w-5 text-violet-200" />
+            <p className="mt-3 text-2xl font-black">
+              {new Set(visibleTeam.map(member => member.subsystem).filter(Boolean)).size}
+            </p>
+            <p className="text-[10px] uppercase tracking-widest text-slate-400">Engineering domains</p>
+          </div>
+          <div className="col-span-2 border-t border-white/10 pt-4 sm:col-span-1 sm:border-l sm:border-t-0 sm:pl-6 sm:pt-0">
+            <Sparkles className="h-5 w-5 text-cyan-200" />
+            <p className="mt-3 text-sm font-bold">One team. Many disciplines.</p>
+            <p className="mt-1 text-[10px] text-slate-400">Built through collaboration.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Subsystem filters */}
+      <section className="mx-auto max-w-7xl px-4 pb-7 sm:px-6 lg:px-8">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-cyan-200">
+              The people
+            </p>
+            <h2 className="mt-1 text-xl font-bold">Our engineering crew</h2>
+          </div>
+          <p className="text-xs text-slate-400">
+            Showing {filteredTeam.length} member{filteredTeam.length === 1 ? '' : 's'}
+          </p>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-3">
+          {subsystems.map(subsystem => (
             <button
-              key={sub}
-              onClick={() => setSelectedSubsystem(sub)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                selectedSubsystem === sub
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
+              key={subsystem}
+              onClick={() => setSelectedSubsystem(subsystem)}
+              className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-semibold transition ${
+                selectedSubsystem === subsystem
+                  ? 'border-cyan-200/40 bg-cyan-200/15 text-cyan-100 shadow-[0_0_20px_rgba(34,211,238,.08)]'
+                  : 'border-white/10 bg-white/[.04] text-slate-400 hover:border-white/20 hover:text-white'
               }`}
             >
-              {sub}
+              {subsystem}
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Team Cards Grid */}
-      {filteredTeam.length === 0 ? (
-        <div className="p-16 text-center bg-[#0C0F17] border border-zinc-800 rounded-2xl space-y-3">
-          <div className="w-12 h-12 mx-auto rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500">
-            <UserIcon className="w-6 h-6" />
-          </div>
-          <h3 className="text-base font-bold text-white">No Team Profiles in this Subsystem</h3>
-          <p className="text-xs text-zinc-400 max-w-md mx-auto">
-            Profiles in &ldquo;{selectedSubsystem}&rdquo; are currently being configured or updated.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredTeam.map((member) => (
-            <div
-              key={member.id}
-              className="bg-[#0C0F17] border border-zinc-800 rounded-xl p-6 flex flex-col justify-between hover:border-zinc-700 transition-all space-y-6"
+      {/* Member profiles */}
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        {filteredTeam.length === 0 ? (
+          <div className={`${glass} px-5 py-20 text-center`}>
+            <UserIcon className="mx-auto h-12 w-12 text-cyan-200/60" />
+            <h3 className="mt-5 text-xl font-bold">
+              No profiles in this department
+            </h3>
+            <p className="mt-2 text-sm text-slate-400">
+              Profiles in {selectedSubsystem} are currently being configured or updated.
+            </p>
+            <button
+              onClick={() => setSelectedSubsystem('All')}
+              className="mt-6 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-5 py-3 text-sm font-bold"
             >
-              <div className="space-y-4">
-                {/* Avatar & Badging */}
-                <div className="flex items-center gap-4">
-                  {member.imageUrl && !failedAvatars[member.id] ? (
-                    <img
-                      src={member.imageUrl}
-                      alt={member.name}
-                      onError={() => setFailedAvatars((prev) => ({ ...prev, [member.id]: true }))}
-                      className="w-14 h-14 rounded-xl object-cover border border-red-500/40 shrink-0"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-red-600/20 to-zinc-800 border border-red-500/30 flex items-center justify-center text-red-400 font-bold text-lg font-mono shrink-0">
-                      {member.name
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')}
-                    </div>
-                  )}
+              View all members
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+            {filteredTeam.map(member => {
+              const initials = member.name
+                .split(' ')
+                .map(part => part[0])
+                .join('')
+                .slice(0, 2);
 
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-bold text-white">{member.name}</h3>
+              return (
+                <article
+                  key={member.id}
+                  className={`${glass} group relative flex min-h-[390px] flex-col overflow-hidden transition duration-300 hover:-translate-y-1 hover:border-cyan-200/30`}
+                >
+                  {/* Member photo */}
+                  <div className="relative h-64 overflow-hidden bg-gradient-to-br from-slate-800 via-[#111b35] to-violet-950/60 sm:h-72">
+                    {member.imageUrl && !failedAvatars[member.id] ? (
+                      <img
+                        src={member.imageUrl}
+                        alt={member.name}
+                        onError={() => setFailedAvatars(prev => ({
+                          ...prev,
+                          [member.id]: true
+                        }))}
+                        loading="lazy"
+                        className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center">
+                        <div className="flex h-24 w-24 items-center justify-center rounded-full border border-cyan-200/20 bg-white/[.06] text-3xl font-black text-cyan-100 shadow-xl">
+                          {initials}
+                        </div>
+                        <p className="mt-4 text-[10px] uppercase tracking-[.2em] text-slate-400">
+                          ALTRON'Z TEAM
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#07101f] via-transparent to-slate-950/10" />
+
+                    <div className="absolute left-4 top-4 flex flex-wrap gap-2">
                       {member.isLead && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-red-950/80 border border-red-800/80 text-red-400">
-                          LEAD
+                        <span className="rounded-full border border-amber-200/20 bg-amber-300/15 px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-amber-100 backdrop-blur-md">
+                          <ShieldCheck className="mr-1 inline h-3 w-3" />
+                          Team lead
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-red-400 font-medium">{member.role}</p>
-                    <p className="text-[11px] text-zinc-400">{member.department || member.yearAndDept}</p>
-                  </div>
-                </div>
 
-                <div className="text-xs text-zinc-300 leading-relaxed font-sans">
-                  {member.bio}
-                </div>
-
-                {/* Skills */}
-                {member.skills && member.skills.length > 0 && (
-                  <div className="space-y-1.5 pt-2 border-t border-zinc-800/80">
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase block">
-                      Technical Competencies
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {member.skills.map((skill, idx) => (
-                        <span
-                          key={idx}
-                          className="text-[11px] text-zinc-300 bg-[#141824] border border-zinc-800 px-2 py-0.5 rounded"
-                        >
-                          {skill}
-                        </span>
-                      ))}
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-cyan-200">
+                        {member.subsystem || 'ALTRON\'Z TEAM'}
+                      </p>
+                      <h3 className="mt-1 text-xl font-black leading-tight text-white sm:text-2xl">
+                        {member.name}
+                      </h3>
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* Contact row */}
-              <div className="pt-4 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-500 font-mono">
-                <span className="truncate max-w-[160px]">{member.email || "ALTRON'Z Lab"}</span>
-                <div className="flex items-center gap-2 text-zinc-400">
-                  {member.linkedin && (
-                    <a
-                      href={member.linkedin}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-red-400 transition-colors p-1"
-                      title="LinkedIn Profile"
-                    >
-                      <Linkedin className="w-3.5 h-3.5" />
-                    </a>
-                  )}
-                  {member.github && (
-                    <a
-                      href={member.github}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:text-red-400 transition-colors p-1"
-                      title="GitHub Profile"
-                    >
-                      <Github className="w-3.5 h-3.5" />
-                    </a>
-                  )}
-                  {member.email && (
-                    <a
-                      href={`mailto:${member.email}`}
-                      className="hover:text-red-400 transition-colors p-1"
-                      title="Send Email"
-                    >
-                      <Mail className="w-3.5 h-3.5" />
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+                  {/* Member details */}
+                  <div className="flex flex-1 flex-col p-5">
+                    <div>
+                      <p className="text-sm font-bold text-violet-200">
+                        {member.role}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {member.department || member.yearAndDept}
+                      </p>
+                    </div>
+
+                    {member.bio && (
+                      <p className="mt-4 line-clamp-4 text-xs leading-6 text-slate-300/70">
+                        {member.bio}
+                      </p>
+                    )}
+
+                    {member.skills && member.skills.length > 0 && (
+                      <div className="mt-4 border-t border-white/10 pt-4">
+                        <p className="mb-2 text-[9px] font-bold uppercase tracking-[.18em] text-slate-500">
+                          Technical skills
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {member.skills.slice(0, 4).map((skill, index) => (
+                            <span
+                              key={index}
+                              className="rounded-lg border border-white/10 bg-white/[.05] px-2.5 py-1.5 text-[10px] text-slate-300"
+                            >
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Social links */}
+                    <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-4">
+                      <span className="max-w-[65%] truncate text-[10px] text-slate-500">
+                        {member.email || "ALTRON'Z Lab"}
+                      </span>
+                      <div className="flex items-center gap-3 text-slate-400">
+                        {member.linkedin && (
+                          <a
+                            href={member.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`${member.name} LinkedIn profile`}
+                            className="transition hover:text-cyan-200"
+                          >
+                            <Linkedin className="h-4 w-4" />
+                          </a>
+                        )}
+                        {member.github && (
+                          <a
+                            href={member.github}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`${member.name} GitHub profile`}
+                            className="transition hover:text-cyan-200"
+                          >
+                            <Github className="h-4 w-4" />
+                          </a>
+                        )}
+                        {member.email && (
+                          <a
+                            href={`mailto:${member.email}`}
+                            aria-label={`Email ${member.name}`}
+                            className="transition hover:text-cyan-200"
+                          >
+                            <Mail className="h-4 w-4" />
+                          </a>
+                        )}
+                        <ArrowUpRight className="h-4 w-4 text-cyan-200/70" />
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Closing message */}
+      <section className="mx-auto max-w-7xl px-4 pt-14 sm:px-6 lg:px-8">
+        <div className={`${glass} relative overflow-hidden p-7 text-center sm:p-10`}>
+          <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-violet-400/15 blur-3xl" />
+          <p className="relative text-[10px] font-bold uppercase tracking-[.25em] text-cyan-200">
+            ALTRON'Z / Together we engineer
+          </p>
+          <h2 className="relative mt-3 text-2xl font-black sm:text-3xl">
+            Different minds. One engineering vision.
+          </h2>
+          <p className="relative mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-300/70">
+            Every build is powered by teamwork, curiosity and the drive to create something meaningful.
+          </p>
         </div>
-      )}
-    </div>
+      </section>
+    </main>
   );
 };
