@@ -128,11 +128,11 @@ export const HomePage: React.FC<HomePageProps> = ({
               <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[10px] font-semibold text-emerald-200">ACTIVE HUB</span>
             </div>
             <div className="relative overflow-hidden rounded-[1.4rem] border border-white/10 bg-slate-950/60">
-              {recentGallery[0]?.imageUrl ? (
-                <img src={recentGallery[0].imageUrl} alt={recentGallery[0].title || "ALTRON'Z project"} className="h-64 w-full object-cover sm:h-[22rem]" />
-              ) : (
-                <RoboVisual type="lab" className="h-64 sm:h-[22rem]" badge="SYSTEMS & HARDWARE LAB" />
-              )}
+              <img
+  src="/altronz_robotics_showcase.jpg"
+  alt="ALTRON'Z Robotics and IoT engineering laboratory"
+  className="h-64 w-full object-cover sm:h-[22rem]"
+/>
               <div className="absolute inset-0 bg-gradient-to-t from-[#07101f]/90 via-transparent to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between gap-4 p-5">
                 <div>
