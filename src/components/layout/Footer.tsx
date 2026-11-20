@@ -27,8 +27,11 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentView }) => {
   const displayYear = footerAboutConfig.copyrightYear || new Date().getFullYear().toString();
 
   return (
-    <footer className="bg-[#050608] border-t border-white/5 text-zinc-400 text-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <footer className="relative isolate overflow-hidden border-t border-cyan-200/10 bg-gradient-to-br from-[#07101f] via-[#111a35] to-[#171331] text-slate-300 text-xs">
+<div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+  <div className="absolute -left-32 top-0 h-80 w-80 rounded-full bg-cyan-500/10 blur-[110px]" />
+  <div className="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-violet-500/15 blur-[110px]" />
+</div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
           {/* Col 1: Wordmark & Identity */}
           <div className="lg:col-span-2 space-y-4">
