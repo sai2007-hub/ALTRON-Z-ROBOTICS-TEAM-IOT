@@ -1,272 +1,365 @@
+
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { RoboVisual } from '../components/common/RoboVisual';
 import { ProjectItem } from '../types';
-import { Cpu, Wrench, Layers, CheckCircle2, ArrowUpRight, Github, ExternalLink, Bot } from 'lucide-react';
+import {
+  Cpu, Wrench, Layers, CheckCircle2, ArrowUpRight,
+  Github, ExternalLink, Bot, X, Sparkles, Code2,
+  CircuitBoard, ChevronRight
+} from 'lucide-react';
 
 export const ProjectsPage: React.FC = () => {
   const { projects, isAdmin } = useApp();
-  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [activeCategory, setActiveCategory] = useState('All');
   const [selectedProject, setSelectedProject] = useState<ProjectItem | null>(null);
   const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
 
-  const categories = ['All', 'Competition Bot', 'Autonomous', 'IoT Solution', 'Research Prototype'];
+  const categories = [
+    'All', 'Competition Bot', 'Autonomous',
+    'IoT Solution', 'Research Prototype'
+  ];
 
-  // Public visitors see published projects; Admins see all
   const visibleProjects = isAdmin
     ? projects
-    : projects.filter((p) => p.published !== false);
+    : projects.filter(p => p.published !== false);
 
-  const filteredProjects =
-    activeCategory === 'All'
-      ? visibleProjects
-      : visibleProjects.filter((p) => p.category === activeCategory);
+  const filteredProjects = activeCategory === 'All'
+    ? visibleProjects
+    : visibleProjects.filter(p => p.category === activeCategory);
+
+  const glass =
+    'rounded-3xl border border-white/10 bg-white/[.055] backdrop-blur-xl shadow-[0_18px_60px_rgba(2,6,23,.25)]';
+
+  const visualFor = (project: ProjectItem) => {
+    if (project.category === 'Competition Bot' && project.title.includes('Sumo')) return 'sumo';
+    if (project.category === 'Competition Bot' && project.title.includes('Omni')) return 'soccer';
+    if (project.category === 'IoT Solution') return 'rover';
+    return 'lab';
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
-      {/* Title & Filter Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-zinc-800">
-        <div>
-          <div className="text-xs font-mono text-red-500 uppercase tracking-widest mb-1">
-            Mechatronics & Embedded R&D
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Engineering Projects & Robot Builds
-          </h1>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-2 max-w-xl">
-            Robotic systems engineered by ALTRON&apos;Z ROBOTICS TEAM &amp; IOT student engineers from schematic design and topology optimization to bare-metal firmware.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-1 p-1 bg-[#12151F] border border-zinc-800 rounded-lg overflow-x-auto">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                activeCategory === cat
-                  ? 'bg-red-600 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
+    <main className="relative isolate min-h-screen overflow-hidden bg-[#07101f] pb-20 text-white">
+      {/* Background */}
+      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+        <div className="absolute -left-40 top-0 h-96 w-96 rounded-full bg-cyan-500/15 blur-[120px]" />
+        <div className="absolute -right-40 top-72 h-[30rem] w-[30rem] rounded-full bg-violet-500/20 blur-[130px]" />
+        <div
+          className="absolute inset-0 opacity-[.09]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(148,163,184,.2) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.2) 1px, transparent 1px)',
+            backgroundSize: '48px 48px'
+          }}
+        />
       </div>
 
-      {/* Projects Grid */}
-      {filteredProjects.length === 0 ? (
-        <div className="p-16 text-center bg-[#0C0F17] border border-zinc-800 rounded-2xl space-y-3">
-          <div className="w-12 h-12 mx-auto rounded-full bg-zinc-800 flex items-center justify-center text-zinc-500">
-            <Bot className="w-6 h-6" />
+      {/* Hero heading */}
+      <section className="mx-auto max-w-7xl px-4 pb-10 pt-12 sm:px-6 sm:pt-16 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div className="max-w-3xl space-y-5">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-200/[.07] px-4 py-2 text-[10px] font-bold uppercase tracking-[.2em] text-cyan-100 sm:text-xs">
+              <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,.9)]" />
+              ALTRON'Z / Engineering & R&D
+            </div>
+
+            <p className="text-xs font-semibold uppercase tracking-[.2em] text-violet-200/80">
+              Mechatronics · Embedded Systems · Innovation
+            </p>
+
+            <h1 className="text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+              Ideas engineered
+              <span className="block bg-gradient-to-r from-cyan-200 via-blue-300 to-violet-300 bg-clip-text text-transparent">
+                into reality.
+              </span>
+            </h1>
+
+            <p className="max-w-2xl text-sm leading-7 text-slate-300/75 sm:text-base">
+              Explore the robotics systems, competition builds, IoT solutions
+              and research prototypes engineered by ALTRON'Z ROBOTICS TEAM & IOT.
+            </p>
           </div>
-          <h3 className="text-base font-bold text-white">No Projects in this Category</h3>
-          <p className="text-xs text-zinc-400 max-w-md mx-auto">
-            Choose &ldquo;All&rdquo; or another category above to view completed and active builds.
-          </p>
+
+          <div className={`${glass} grid grid-cols-2 gap-5 p-5 sm:min-w-64`}>
+            <div>
+              <p className="text-3xl font-black text-white">{visibleProjects.length}</p>
+              <p className="mt-1 text-[10px] uppercase tracking-widest text-slate-400">Projects</p>
+            </div>
+            <div>
+              <p className="text-3xl font-black text-cyan-200">
+                {new Set(visibleProjects.map(p => p.category)).size}
+              </p>
+              <p className="mt-1 text-[10px] uppercase tracking-widest text-slate-400">Domains</p>
+            </div>
+          </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {filteredProjects.map((proj) => {
-            const visualType =
-              proj.category === 'Competition Bot' && proj.title.includes('Sumo')
-                ? 'sumo'
-                : proj.category === 'Competition Bot' && proj.title.includes('Omni')
-                ? 'soccer'
-                : proj.category === 'IoT Solution'
-                ? 'rover'
-                : 'lab';
 
-            return (
-              <div
-                key={proj.id}
-                className="bg-[#0C0F17] border border-zinc-800 rounded-xl overflow-hidden flex flex-col justify-between hover:border-zinc-700 transition-all group"
+        {/* Domain highlights */}
+        <div className="mt-9 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { icon: Bot, label: 'Robotics' },
+            { icon: Cpu, label: 'Embedded' },
+            { icon: CircuitBoard, label: 'IoT Systems' },
+            { icon: Sparkles, label: 'Research' }
+          ].map(({ icon: Icon, label }) => (
+            <div key={label} className={`${glass} flex items-center gap-3 p-4`}>
+              <Icon className="h-5 w-5 shrink-0 text-cyan-200" />
+              <span className="text-xs font-semibold text-slate-200">{label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Filters */}
+      <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-cyan-200">
+              Project database
+            </p>
+            <h2 className="mt-1 text-xl font-bold">Explore our builds</h2>
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {categories.map(category => (
+              <button
+                key={category}
+                onClick={() => setActiveCategory(category)}
+                className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-semibold transition ${
+                  activeCategory === category
+                    ? 'border-cyan-200/40 bg-cyan-200/15 text-cyan-100 shadow-[0_0_20px_rgba(34,211,238,.08)]'
+                    : 'border-white/10 bg-white/[.04] text-slate-400 hover:border-white/20 hover:text-white'
+                }`}
               >
-                <div>
-                  <div className="p-3 bg-[#111420] border-b border-zinc-800/80 overflow-hidden flex items-center justify-center min-h-[12rem]">
-                    {proj.imageUrl && !failedImages[proj.id] ? (
-                      <img
-                        src={proj.imageUrl}
-                        alt={proj.title}
-                        onError={() => setFailedImages((prev) => ({ ...prev, [proj.id]: true }))}
-                        className="w-full h-48 object-cover rounded-lg group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <RoboVisual type={visualType} className="h-48" title={proj.category} />
-                    )}
-                  </div>
+                {category}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
-                  <div className="p-6 space-y-4">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-mono text-red-400 font-semibold uppercase">
-                        {proj.category}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300">
-                          {proj.status}
-                        </span>
-                        <span className="text-zinc-400 font-mono text-[11px] bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded">
-                          Lead: {proj.teamLead}
-                        </span>
-                      </div>
-                    </div>
+      {/* Project cards */}
+      <section className="mx-auto max-w-7xl px-4 pt-5 sm:px-6 lg:px-8">
+        {filteredProjects.length === 0 ? (
+          <div className={`${glass} px-5 py-20 text-center`}>
+            <Bot className="mx-auto h-12 w-12 text-cyan-200/60" />
+            <h3 className="mt-5 text-xl font-bold">No projects in this category</h3>
+            <p className="mt-2 text-sm text-slate-400">
+              Choose another category to explore our engineering builds.
+            </p>
+            <button
+              onClick={() => setActiveCategory('All')}
+              className="mt-6 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-5 py-3 text-sm font-bold"
+            >
+              View all projects
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2">
+            {filteredProjects.map(project => (
+              <article
+                key={project.id}
+                className={`${glass} group overflow-hidden transition duration-300 hover:-translate-y-1 hover:border-cyan-200/30`}
+              >
+                {/* Project image */}
+                <div className="relative overflow-hidden border-b border-white/10 bg-slate-950/50 p-3">
+                  {project.imageUrl && !failedImages[project.id] ? (
+                    <img
+                      src={project.imageUrl}
+                      alt={project.title}
+                      onError={() => setFailedImages(prev => ({ ...prev, [project.id]: true }))}
+                      className="h-52 w-full rounded-2xl object-cover transition duration-500 group-hover:scale-[1.025] sm:h-64"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <RoboVisual
+                      type={visualFor(project)}
+                      className="h-52 sm:h-64"
+                      title={project.category}
+                    />
+                  )}
 
-                    <h3 className="text-xl font-bold text-white group-hover:text-red-400 transition-colors">
-                      {proj.title}
-                    </h3>
-
-                    <p className="text-xs text-zinc-300 leading-relaxed font-medium">
-                      {proj.summary}
-                    </p>
-
-                    <p className="text-xs text-zinc-400 leading-relaxed line-clamp-2">
-                      {proj.description}
-                    </p>
-
-                    {/* Tech stack tags */}
-                    {proj.technologies && proj.technologies.length > 0 && (
-                      <div className="pt-2">
-                        <span className="text-[10px] font-mono text-zinc-500 uppercase block mb-1.5">
-                          Subsystem Technologies
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {proj.technologies.map((tech, idx) => (
-                            <span
-                              key={idx}
-                              className="text-[11px] text-zinc-300 bg-[#141824] border border-zinc-800 px-2 py-0.5 rounded"
-                            >
-                              {tech}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Hardware specs strip */}
-                    {proj.hardwareSpecs && proj.hardwareSpecs.length > 0 && (
-                      <div className="pt-3 border-t border-zinc-800/80 grid grid-cols-2 gap-2 text-xs font-mono">
-                        {proj.hardwareSpecs.slice(0, 2).map((spec, idx) => (
-                          <div key={idx}>
-                            <span className="text-zinc-500 text-[10px] block">{spec.label}</span>
-                            <span className="text-zinc-200 font-semibold truncate block">
-                              {spec.value}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                  <div className="absolute left-6 top-6 rounded-full border border-cyan-200/20 bg-slate-950/75 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-cyan-100 backdrop-blur">
+                    {project.category}
                   </div>
                 </div>
 
-                <div className="p-6 pt-0 space-y-2">
-                  <div className="flex items-center gap-2">
-                    {proj.githubUrl && (
+                <div className="space-y-5 p-5 sm:p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="rounded-full border border-emerald-200/15 bg-emerald-200/10 px-3 py-1 text-[10px] font-semibold text-emerald-200">
+                      {project.status}
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Project lead: {project.teamLead}
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-white transition group-hover:text-cyan-100 sm:text-2xl">
+                      {project.title}
+                    </h3>
+                    <p className="mt-3 text-sm font-medium leading-relaxed text-slate-200/85">
+                      {project.summary}
+                    </p>
+                    <p className="mt-2 line-clamp-3 text-xs leading-6 text-slate-400">
+                      {project.description}
+                    </p>
+                  </div>
+
+                  {/* Technologies */}
+                  {project.technologies && project.technologies.length > 0 && (
+                    <div className="border-t border-white/10 pt-4">
+                      <div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-cyan-200/80">
+                        <Layers className="h-3.5 w-3.5" />
+                        Technology stack
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {project.technologies.map((tech, index) => (
+                          <span
+                            key={index}
+                            className="rounded-lg border border-white/10 bg-white/[.05] px-3 py-1.5 text-[11px] text-slate-300"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hardware specifications */}
+                  {project.hardwareSpecs && project.hardwareSpecs.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
+                      {project.hardwareSpecs.slice(0, 2).map((spec, index) => (
+                        <div key={index} className="rounded-xl border border-white/[.08] bg-white/[.035] p-3">
+                          <p className="text-[9px] uppercase tracking-widest text-slate-500">{spec.label}</p>
+                          <p className="mt-1 truncate text-xs font-semibold text-slate-200">{spec.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex flex-wrap gap-2 border-t border-white/10 pt-4">
+                    {project.githubUrl && (
                       <a
-                        href={proj.githubUrl}
+                        href={project.githubUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-lg border border-zinc-800 text-xs flex items-center gap-1.5"
-                        title="GitHub Repository"
+                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.05] px-3 py-3 text-xs font-semibold text-slate-300 hover:bg-white/10"
                       >
-                        <Github className="w-3.5 h-3.5" />
-                        <span>Code</span>
+                        <Github className="h-4 w-4" /> Code
                       </a>
                     )}
-                    {proj.demoUrl && (
+
+                    {project.demoUrl && (
                       <a
-                        href={proj.demoUrl}
+                        href={project.demoUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white rounded-lg border border-zinc-800 text-xs flex items-center gap-1.5"
-                        title="Live Demo"
+                        className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.05] px-3 py-3 text-xs font-semibold text-slate-300 hover:bg-white/10"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Demo</span>
+                        <ExternalLink className="h-4 w-4" /> Demo
                       </a>
                     )}
+
                     <button
-                      onClick={() => setSelectedProject(proj)}
-                      className="flex-1 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg text-center transition-colors flex items-center justify-center gap-1.5 border border-zinc-800 cursor-pointer"
+                      onClick={() => setSelectedProject(project)}
+                      className="ml-auto inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-4 py-3 text-xs font-bold text-white transition hover:brightness-110 sm:flex-none"
                     >
-                      <span>View Engineering Specs</span>
-                      <ArrowUpRight className="w-3.5 h-3.5 text-red-500" />
+                      Engineering specs <ArrowUpRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
 
-      {/* Detail Dialog */}
+      {/* Engineering specs dialog */}
       {selectedProject && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+          aria-label={`${selectedProject.title} engineering specifications`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-3 backdrop-blur-xl sm:p-6"
+          onClick={() => setSelectedProject(null)}
         >
-          <div className="relative w-full max-w-2xl bg-[#0F1219] border border-zinc-800 rounded-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start border-b border-zinc-800 pb-3">
+          <div
+            className={`${glass} relative max-h-[92vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-7`}
+            onClick={event => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
               <div>
-                <span className="text-xs font-mono text-red-500 uppercase tracking-widest block">
-                  {selectedProject.category} // {selectedProject.status}
-                </span>
-                <h3 className="text-xl font-bold text-white mt-1">{selectedProject.title}</h3>
+                <p className="text-[10px] font-bold uppercase tracking-[.2em] text-cyan-200">
+                  ALTRON'Z / Engineering specifications
+                </p>
+                <h2 className="mt-2 text-2xl font-black">{selectedProject.title}</h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  {selectedProject.category} · {selectedProject.status}
+                </p>
               </div>
               <button
                 onClick={() => setSelectedProject(null)}
-                className="text-zinc-400 hover:text-white p-1 rounded hover:bg-zinc-800"
+                aria-label="Close specifications"
+                className="rounded-xl border border-white/10 bg-white/[.06] p-2 text-slate-300 hover:bg-white/10"
               >
-                ✕
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="p-2 bg-[#080A0E] rounded-lg border border-zinc-800 flex items-center justify-center">
-              {selectedProject.imageUrl ? (
+            <div className="my-5 overflow-hidden rounded-2xl border border-white/10 bg-slate-950/50">
+              {selectedProject.imageUrl && !failedImages[selectedProject.id] ? (
                 <img
                   src={selectedProject.imageUrl}
                   alt={selectedProject.title}
-                  className="w-full max-h-64 object-contain rounded-lg"
+                  onError={() => setFailedImages(prev => ({ ...prev, [selectedProject.id]: true }))}
+                  className="max-h-64 w-full object-contain"
                 />
               ) : (
-                <RoboVisual
-                  type={selectedProject.title.includes('Sumo') ? 'sumo' : 'rover'}
-                  className="h-56"
-                />
+                <RoboVisual type={visualFor(selectedProject)} className="h-56" />
               )}
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-5">
               <div>
-                <span className="text-zinc-500 block uppercase font-mono text-[10px]">Synopsis</span>
-                <p className="text-zinc-300 font-medium mt-0.5">{selectedProject.summary}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-200">Project synopsis</p>
+                <p className="mt-2 text-sm leading-6 text-slate-200">{selectedProject.summary}</p>
               </div>
 
               <div>
-                <span className="text-zinc-500 block uppercase font-mono text-[10px]">Detailed Architecture</span>
-                <p className="text-zinc-400 leading-relaxed mt-0.5">{selectedProject.description}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-200">Detailed architecture</p>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{selectedProject.description}</p>
               </div>
 
               {selectedProject.teamMembers && selectedProject.teamMembers.length > 0 && (
                 <div>
-                  <span className="text-zinc-500 block uppercase font-mono text-[10px]">Project Team</span>
-                  <p className="text-zinc-300 mt-0.5">{selectedProject.teamMembers.join(', ')}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-200">Project team</p>
+                  <p className="mt-2 text-sm text-slate-300">{selectedProject.teamMembers.join(', ')}</p>
+                </div>
+              )}
+
+              {selectedProject.technologies && selectedProject.technologies.length > 0 && (
+                <div>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-cyan-200">Technology stack</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedProject.technologies.map((tech, index) => (
+                      <span key={index} className="rounded-lg border border-white/10 bg-white/[.05] px-3 py-2 text-xs text-slate-300">
+                        {tech}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
 
               {selectedProject.hardwareSpecs && selectedProject.hardwareSpecs.length > 0 && (
                 <div>
-                  <span className="text-zinc-500 block uppercase font-mono text-[10px] mb-1.5">
-                    Hardware Specifications
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 bg-[#0B0D14] p-3 rounded-lg border border-zinc-800">
-                    {selectedProject.hardwareSpecs.map((s, idx) => (
-                      <div key={idx} className="flex justify-between py-1 border-b border-zinc-800/60 text-[11px]">
-                        <span className="text-zinc-400">{s.label}:</span>
-                        <span className="font-mono text-zinc-200 font-semibold">{s.value}</span>
+                  <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-cyan-200">Hardware specifications</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {selectedProject.hardwareSpecs.map((spec, index) => (
+                      <div key={index} className="flex justify-between gap-3 rounded-xl border border-white/10 bg-white/[.04] p-3 text-xs">
+                        <span className="text-slate-400">{spec.label}</span>
+                        <span className="text-right font-semibold text-white">{spec.value}</span>
                       </div>
                     ))}
                   </div>
@@ -274,28 +367,27 @@ export const ProjectsPage: React.FC = () => {
               )}
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-zinc-800">
+            <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-white/10 pt-5">
               {selectedProject.githubUrl && (
                 <a
                   href={selectedProject.githubUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold rounded-lg flex items-center gap-1.5"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.06] px-4 py-3 text-xs font-semibold hover:bg-white/10"
                 >
-                  <Github className="w-3.5 h-3.5" />
-                  <span>GitHub Repository</span>
+                  <Github className="h-4 w-4" /> GitHub
                 </a>
               )}
               <button
                 onClick={() => setSelectedProject(null)}
-                className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                className="rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 px-5 py-3 text-xs font-bold"
               >
-                Close Specs
+                Close specifications
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 };
