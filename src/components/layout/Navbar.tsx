@@ -69,7 +69,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, []);
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#08090C]/90 backdrop-blur-md border-b border-white/5">
+    <header className="sticky top-0 z-40 w-full bg-[#07101f]/85 backdrop-blur-2xl border-b border-cyan-200/10 shadow-[0_8px_30px_rgba(2,6,23,.25)]">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4 sm:gap-8 px-4 sm:px-6 lg:px-8 h-16">
         {/* Zone 1: Scalable Altronz Vector Logo & Wordmark */}
         <button
