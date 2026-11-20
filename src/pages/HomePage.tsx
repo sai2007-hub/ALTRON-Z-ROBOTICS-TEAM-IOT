@@ -339,4 +339,56 @@ export const HomePage: React.FC<HomePageProps> = ({
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.title} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
                   ) : (
+
+                    <RoboVisual type={item.svgType || 'sumo'} className="h-full" />
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="text-[10px] text-cyan-200/80">
+                    {item.category} · {item.year}
+                  </p>
+                  <p className="mt-1 truncate text-xs font-bold">
+                    {item.title}
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* FINAL CTA */}
+      <section className="mx-auto max-w-7xl px-4 pb-8 pt-12 sm:px-6 lg:px-8">
+        <div className="relative overflow-hidden rounded-[2rem] border border-violet-200/20 bg-gradient-to-br from-blue-500/20 via-[#111b35]/90 to-violet-500/20 p-7 text-center shadow-2xl shadow-blue-950/30 sm:p-12">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-violet-400/20 blur-3xl" />
+          <div className="relative mx-auto max-w-2xl space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-[.24em] text-cyan-200">
+              Your next build starts here
+            </p>
+            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
+              Ready to engineer what comes next?
+            </h2>
+            <p className="text-sm leading-relaxed text-slate-200/75 sm:text-base">
+              Join the community, compete with your ideas or bring practical robotics learning to your institution.
+            </p>
+            <div className="flex flex-col justify-center gap-3 pt-2 sm:flex-row">
+              <button
+                onClick={() => setCurrentView('projects')}
+                className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-100"
+              >
+                Explore projects
+              </button>
+              <button
+                onClick={() => onOpenEnquiry()}
+                className="rounded-xl border border-white/20 bg-white/[.08] px-6 py-3 text-sm font-semibold backdrop-blur-xl hover:bg-white/[.14]"
+              >
+                Connect with ALTRON'Z
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+};
                   
