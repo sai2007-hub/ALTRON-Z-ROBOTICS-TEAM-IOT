@@ -57,10 +57,10 @@ export const OtherEventsPage: React.FC<OtherEventsPageProps> = ({
       {/* Title & Filter Bar */}
       <div className="relative flex flex-col xl:flex-row xl:items-end xl:justify-between gap-8 rounded-3xl border border-cyan-200/10 bg-gradient-to-br from-[#101d35] via-[#10172b] to-[#171331] p-6 sm:p-8 lg:p-10 shadow-2xl shadow-black/20">
         <div>
-          <div className="text-xs font-mono text-red-500 uppercase tracking-widest mb-1">
+          <div className="text-xs font-bold text-cyan-300 uppercase tracking-[0.22em] mb-3">
             ALTRON&apos;Z ROBOTICS TEAM &amp; IOT Competitions &amp; Rulebooks
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
             Robotics Tournaments & Challenges
           </h1>
           <p className="text-xs sm:text-sm text-zinc-400 mt-2 max-w-xl">
