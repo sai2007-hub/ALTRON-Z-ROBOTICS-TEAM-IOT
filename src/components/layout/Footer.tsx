@@ -32,7 +32,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentView }) => {
   <div className="absolute -left-32 top-0 h-80 w-80 rounded-full bg-cyan-500/10 blur-[110px]" />
   <div className="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-violet-500/15 blur-[110px]" />
 </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12 px-6 pt-12 sm:px-8">
           {/* Col 1: Wordmark & Identity */}
           <div className="lg:col-span-2 space-y-4">
             <button
@@ -146,7 +146,7 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentView }) => {
         </div>
 
         {/* Bottom bar */}
-        <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-zinc-500">
+        <div className="px-6 pt-8 pb-8 border-t border-cyan-200/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-zinc-400 sm:px-8">
           <div>
             © {displayYear} {footerAboutConfig.copyrightText || `${footerAboutConfig.teamName}. All rights reserved.`}
           </div>
