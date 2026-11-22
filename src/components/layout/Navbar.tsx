@@ -310,7 +310,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div
           role="dialog"
           aria-label="Mobile Navigation Menu"
-          className="lg:hidden fixed top-16 left-0 right-0 max-h-[calc(100vh-4rem)] overflow-y-auto bg-[#07101F] border-b border-cyan-200/15 shadow-2xl shadow-black/80 z-40 p-4 space-y-4"
+          className="lg:hidden fixed top-16 left-0 right-0 max-h-[calc(100vh-4rem)] overflow-y-auto bg-[#070D18] border-b border-cyan-200/15 shadow-2xl shadow-black/80 z-40 p-4 space-y-4"
         >
           {/* Group 1: Core Navigation */}
           <div>
