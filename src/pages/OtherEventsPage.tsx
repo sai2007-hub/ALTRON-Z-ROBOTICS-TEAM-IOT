@@ -53,7 +53,7 @@ export const OtherEventsPage: React.FC<OtherEventsPageProps> = ({
       : visibleEvents.filter((e) => e.category === selectedCategory);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+    <div className="relative isolate min-h-screen w-full overflow-hidden bg-[#07101f] px-4 py-10 text-white sm:px-6 lg:px-8">
       {/* Title & Filter Bar */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-zinc-800">
         <div>
