@@ -180,7 +180,6 @@ export const Footer: React.FC<FooterProps> = ({ setCurrentView }) => {
             )}
           </div>
         </div>
-      </div>
     </footer>
   );
 };
