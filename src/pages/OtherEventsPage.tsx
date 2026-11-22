@@ -70,15 +70,15 @@ export const OtherEventsPage: React.FC<OtherEventsPageProps> = ({
 
         {/* Filter Segmented Control */}
         {visibleEvents.length > 0 && (
-          <div className="flex items-center gap-1 p-1 bg-[#12151F] border border-zinc-800 rounded-lg overflow-x-auto">
+          <div className="flex w-full md:w-auto items-center gap-1.5 p-1.5 rounded-2xl border border-cyan-200/10 bg-[#0b1528]/90 overflow-x-auto shadow-lg shadow-black/20">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-4 py-2.5 text-xs font-bold rounded-xl transition-all duration-300 whitespace-nowrap shrink-0 cursor-pointer ${
                   selectedCategory === cat
-                    ? 'bg-red-600 text-white shadow-sm'
-                    : 'text-zinc-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-950/40'
+                    : 'text-slate-400 hover:text-cyan-200 hover:bg-white/5'
                 }`}
               >
                 {cat}
