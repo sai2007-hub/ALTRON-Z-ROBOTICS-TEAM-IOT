@@ -55,7 +55,7 @@ export const OtherEventsPage: React.FC<OtherEventsPageProps> = ({
   return (
     <div className="relative isolate min-h-screen w-full overflow-hidden bg-[#07101f] px-4 py-10 text-white sm:px-6 lg:px-8">
       {/* Title & Filter Bar */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-zinc-800">
+      <div className="relative flex flex-col xl:flex-row xl:items-end xl:justify-between gap-8 rounded-3xl border border-cyan-200/10 bg-gradient-to-br from-[#101d35] via-[#10172b] to-[#171331] p-6 sm:p-8 lg:p-10 shadow-2xl shadow-black/20">
         <div>
           <div className="text-xs font-mono text-red-500 uppercase tracking-widest mb-1">
             ALTRON&apos;Z ROBOTICS TEAM &amp; IOT Competitions &amp; Rulebooks
